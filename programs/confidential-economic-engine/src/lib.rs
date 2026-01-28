@@ -40,7 +40,7 @@ pub mod confidential_economic_engine {
             TransferChecked {
                 source: ctx.accounts.from_token.to_account_info(),
                 mint: ctx.accounts.token_mint.to_account_info(),
-                destination: ctx.accounts.to_token.to_account_info(),
+                destination: ctx.accounts.vault_token_account.to_account_info(),
                 authority: ctx.accounts.payer.to_account_info(),
                 inco_lightning_program: ctx.accounts.inco_lightning_program.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
@@ -84,17 +84,10 @@ pub mod confidential_economic_engine {
 
     pub fn distribute(
         ctx: Context<Distribute>,
-        encrypted_share: Vec<u8>,
+        encrypted_requested: Vec<u8>,
+        decimals: u8,
     ) -> Result<()>{
 
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
-        );
-
-        let share : Euint128 = new_euint128(cpi_ctx, encrypted_share, 0)?;
 
         let cpi_ctx = CpiContext::new(
             ctx.accounts.inco_lightning_program.to_account_info(),
@@ -103,15 +96,94 @@ pub mod confidential_economic_engine {
             }
         );
 
-        let new_dist = e_add(cpi_ctx,
+        let requested : Euint128 = new_euint128(cpi_ctx, encrypted_requested.clone(), 0)?;
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_lightning_program.to_account_info(),
+            Operation{
+                signer: ctx.accounts.authority.to_account_info(),
+            }
+        );
+
+        let remaining = e_sub(
+            cpi_ctx,
+            Euint128(ctx.accounts.fee_vault.total_fees_handle),
             Euint128(ctx.accounts.fee_vault.pending_distribution_handle),
-            share,
             0
         )?;
 
-        ctx.accounts.fee_vault.pending_distribution_handle = new_dist.0;
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_lightning_program.to_account_info(),
+            Operation{
+                signer: ctx.accounts.authority.to_account_info(),
+            }
+        );
+
+        let can_distribute = e_ge(
+            cpi_ctx,
+            remaining,
+            requested,
+            0
+        )?;
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_lightning_program.to_account_info(),
+            Operation{
+                signer: ctx.accounts.authority.to_account_info(),
+            }
+        );
+
+        let actual = e_select(
+            cpi_ctx,
+            can_distribute,
+            requested,
+            remaining,
+            0
+        )?;
+
+        let token_cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_token_program.to_account_info(),
+            TransferChecked {
+                source: ctx.accounts.vault_token_account.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
+                destination: ctx.accounts.recipient_token_account.to_account_info(),
+                authority: ctx.accounts.authority.to_account_info(),
+                inco_lightning_program: ctx.accounts.inco_lightning_program.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+            }   
+        );
+
+        transfer_checked(
+            token_cpi_ctx,
+            encrypted_requested,
+            0,
+            decimals,
+        )?;
+        
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_lightning_program.to_account_info(),
+            Operation{
+                signer: ctx.accounts.authority.to_account_info(),
+            }
+        );
 
 
+        let new_pending = e_add(
+            cpi_ctx,
+            Euint128(ctx.accounts.fee_vault.pending_distribution_handle),
+            actual,
+            0,
+        )?;
+
+        ctx.accounts.fee_vault.pending_distribution_handle = new_pending.0;
+
+        Ok(())
+    }
+
+    pub fn settle_epoch(ctx: Context<SettleEpoch>) -> Result<()> {
+        ctx.accounts.fee_vault.total_fees_handle = 0;
+        ctx.accounts.fee_vault.pending_distribution_handle = 0;
+        ctx.accounts.fee_vault.is_closed = true;
         Ok(())
     }
 }
@@ -156,7 +228,7 @@ pub struct CollectFee<'info> {
     
     /// CHECK: Token account to which fees are sent
     #[account(mut)]
-    pub to_token: AccountInfo<'info>,
+    pub vault_token_account: AccountInfo<'info>,
 
     /// CHECK: Token mint for which fees are being collected
     pub token_mint: AccountInfo<'info>,
@@ -183,12 +255,33 @@ pub struct Distribute<'info>{
     
     /// CHECK: Token account from which fees are distributed
     #[account(mut)]
-    pub to_token: AccountInfo<'info>,
+    pub vault_token_account: AccountInfo<'info>,
+    
+    /// CHECK: Token mint for which fees are being distributed
+    #[account(mut)]
+    pub recipient_token_account: AccountInfo<'info>,
+
+    /// CHECK
+    pub token_mint: AccountInfo<'info>,
+
+    /// CHECK
+    pub inco_token_program: AccountInfo<'info>,
 
     /// CHECK: Inco Lightning program for encrypted operations
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
 
+    pub system_program: Program<'info, System>,
+
+}
+
+
+#[derive(Accounts)]
+pub struct SettleEpoch<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(mut, has_one = authority)]
+    pub fee_vault: Account<'info, FeeVault>,
 }
 
 
