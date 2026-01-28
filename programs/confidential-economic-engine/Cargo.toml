@@ -24,3 +24,4 @@ custom-panic = []
 anchor-lang = "0.31.1"  
 anchor-spl = "0.31.1"  
 inco-lightning = { version = "0.1.4", features = ["cpi"] }
+inco-token = { git = "https://github.com/Inco-fhevm/lightning-rod-solana", features = ["cpi"] }

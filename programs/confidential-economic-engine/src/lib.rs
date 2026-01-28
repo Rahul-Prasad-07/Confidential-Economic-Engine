@@ -4,6 +4,9 @@ use inco_lightning::types::Euint128;
 use inco_lightning::cpi::accounts::Operation;
 use inco_lightning::ID as INCO_LIGHTNING_ID;
 
+use inco_token::cpi::accounts::TransferChecked;
+use inco_token::cpi::transfer_checked;
+
 
 declare_id!("MTEXkxhfcwDkx1dKNDmmvx22kLDe561hwCjYjkyNYin");
 
@@ -17,6 +20,7 @@ pub mod confidential_economic_engine {
 
        vault.authority = ctx.accounts.authority.key();
        vault.token_mint =  ctx.accounts.token_mint.key();
+       vault.vault_token_account =  ctx.accounts.vault_token_account.key();
        vault.total_fees_handle = 0u128;
        vault.pending_distribution_handle = 0u128;
        vault.is_closed = false;
@@ -102,6 +106,9 @@ pub struct Initialize <'info>{
     /// CHECK: Token mint for which the fee vault is being created
     pub token_mint: AccountInfo<'info>,
     
+    /// CHECK: Token account that will hold the fees
+    pub vault_token_account: AccountInfo<'info>,
+    
     
     #[account(
         init,
@@ -131,6 +138,7 @@ pub struct CollectFee<'info> {
     /// CHECK: Token account to which fees are sent
     #[account(mut)]
     pub to_token: AccountInfo<'info>,
+    
 
     /// CHECK: Inco Lightning program for encrypted operations
     #[account(address = INCO_LIGHTNING_ID)]
@@ -161,6 +169,7 @@ pub struct Distribute<'info>{
 pub struct FeeVault {
     pub authority: Pubkey,
     pub token_mint: Pubkey,
+    pub vault_token_account: Pubkey,
     pub total_fees_handle: u128,  // encrypted total fees collected handle as u128, not Euint128
     pub pending_distribution_handle: u128, // encrypted pending distribution handle as u128, not Euint128
     pub is_closed: bool,

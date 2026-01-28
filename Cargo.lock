@@ -515,6 +515,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "inco-lightning",
+ "inco-token",
 ]
 
 [[package]]
@@ -784,6 +785,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e056accb58463217b321a5a9a7d3e6887b5ae0c396fec384661d2d95c5018df"
 dependencies = [
  "anchor-lang",
+]
+
+[[package]]
+name = "inco-token"
+version = "0.1.0"
+source = "git+https://github.com/Inco-fhevm/lightning-rod-solana#b75af11c87e2f1cca97a0bc84ae921b0bf5e6bc1"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "inco-lightning",
 ]
 
 [[package]]
