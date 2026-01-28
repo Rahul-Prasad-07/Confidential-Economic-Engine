@@ -32,9 +32,28 @@ pub mod confidential_economic_engine {
     pub fn collect_fee(
         ctx: Context<CollectFee>,
         encrypted_amount: Vec<u8>,
+        decimals: u8,
     ) -> Result<()>{
 
-        // Convert client-encrypted ciphertext to encrypted handle
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.inco_token_program.to_account_info(),
+            TransferChecked {
+                source: ctx.accounts.from_token.to_account_info(),
+                mint: ctx.accounts.token_mint.to_account_info(),
+                destination: ctx.accounts.to_token.to_account_info(),
+                authority: ctx.accounts.payer.to_account_info(),
+                inco_lightning_program: ctx.accounts.inco_lightning_program.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+            }
+        );
+
+        transfer_checked(
+            cpi_ctx,
+            encrypted_amount.clone(),
+            0,
+            decimals,
+        )?;
+
         let cpi_ctx = CpiContext::new(
             ctx.accounts.inco_lightning_program.to_account_info(),
             Operation {
@@ -138,11 +157,19 @@ pub struct CollectFee<'info> {
     /// CHECK: Token account to which fees are sent
     #[account(mut)]
     pub to_token: AccountInfo<'info>,
+
+    /// CHECK: Token mint for which fees are being collected
+    pub token_mint: AccountInfo<'info>,
+    
+    /// CHECK: Inco Token program for token transfers
+    pub inco_token_program: AccountInfo<'info>,
     
 
     /// CHECK: Inco Lightning program for encrypted operations
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
+
+    system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
