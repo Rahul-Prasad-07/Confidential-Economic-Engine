@@ -3,12 +3,15 @@ use inco_lightning::cpi::{e_add, e_sub, e_ge, e_select, new_euint128};
 use inco_lightning::types::Euint128;
 use inco_lightning::cpi::accounts::Operation;
 use inco_lightning::ID as INCO_LIGHTNING_ID;
+use inco_lightning::cpi::accounts::Allow;
+use inco_lightning::cpi::allow;
 
 use inco_token::cpi::accounts::TransferChecked;
 use inco_token::cpi::transfer_checked;
 
 
-declare_id!("MTEXkxhfcwDkx1dKNDmmvx22kLDe561hwCjYjkyNYin");
+
+declare_id!("BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4");
 
 #[program]
 pub mod confidential_economic_engine {
@@ -47,6 +50,8 @@ pub mod confidential_economic_engine {
             }
         );
 
+        msg!("Transferring fee to vault...");
+
         transfer_checked(
             cpi_ctx,
             encrypted_amount.clone(),
@@ -54,12 +59,16 @@ pub mod confidential_economic_engine {
             decimals,
         )?;
 
+        msg!("transfer complete.");
+
         let cpi_ctx = CpiContext::new(
             ctx.accounts.inco_lightning_program.to_account_info(),
             Operation {
                 signer: ctx.accounts.payer.to_account_info(),
             },
         );
+
+        msg!("Creating encrypted amount...");
 
         let amount: Euint128 = new_euint128(cpi_ctx, encrypted_amount, 0)?;
 
@@ -69,12 +78,14 @@ pub mod confidential_economic_engine {
                 signer: ctx.accounts.payer.to_account_info(),
             },
         );
+        msg!("Adding to total fees...");
 
         let updated_total = e_add(cpi_ctx, 
             Euint128(ctx.accounts.fee_vault.total_fees_handle),
             amount,
             0
         )?;
+        
 
         ctx.accounts.fee_vault.total_fees_handle = updated_total.0;
 
@@ -186,6 +197,27 @@ pub mod confidential_economic_engine {
         ctx.accounts.fee_vault.is_closed = true;
         Ok(())
     }
+
+    pub fn grant_decrypt_access(
+    ctx: Context<GrantDecryptAccess>,
+    handle: u128,
+) -> Result<()> {
+
+    let cpi_ctx = CpiContext::new(
+        ctx.accounts.inco_lightning_program.to_account_info(),
+        Allow {
+            allowance_account: ctx.accounts.allowance_account.to_account_info(),
+            signer: ctx.accounts.authority.to_account_info(),
+            allowed_address: ctx.accounts.allowed_address.to_account_info(),
+            system_program: ctx.accounts.system_program.to_account_info(),
+        },
+    );
+
+    // grant = true
+    allow(cpi_ctx, handle, true, ctx.accounts.allowed_address.key())?;
+
+    Ok(())
+}
 }
 
 #[derive(Accounts)]
@@ -216,7 +248,8 @@ pub struct Initialize <'info>{
 
 #[derive(Accounts)]
 pub struct CollectFee<'info> {
-
+    
+    #[account(mut)]
     pub payer : Signer<'info>,
     
     #[account(mut)]
@@ -231,6 +264,7 @@ pub struct CollectFee<'info> {
     pub vault_token_account: AccountInfo<'info>,
 
     /// CHECK: Token mint for which fees are being collected
+    #[account(mut)]
     pub token_mint: AccountInfo<'info>,
     
     /// CHECK: Inco Token program for token transfers
@@ -241,7 +275,7 @@ pub struct CollectFee<'info> {
     #[account(address = INCO_LIGHTNING_ID)]
     pub inco_lightning_program: AccountInfo<'info>,
 
-    system_program: Program<'info, System>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -274,6 +308,25 @@ pub struct Distribute<'info>{
     pub system_program: Program<'info, System>,
 
 }
+
+#[derive(Accounts)]
+pub struct GrantDecryptAccess<'info> {
+    pub authority: Signer<'info>,
+
+    /// CHECK: PDA derived from [handle, allowed_address]
+    #[account(mut)]
+    pub allowance_account: AccountInfo<'info>,
+
+    /// CHECK: Who can decrypt
+    pub allowed_address: AccountInfo<'info>,
+
+    /// CHECK
+    #[account(address = INCO_LIGHTNING_ID)]
+    pub inco_lightning_program: AccountInfo<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
 
 
 #[derive(Accounts)]
