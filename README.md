@@ -746,26 +746,29 @@ sequenceDiagram
 #### Sealed-Bid Auctions
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Bidding: Auction starts
-    Bidding --> Sealed: Bids encrypted
+flowchart LR
+    A[Auction Starts] --> B[Bidding Phase]
+    B --> C[Sealed Bids]
     
-    state Sealed {
-        [*] --> Bid1
-        [*] --> Bid2
-        [*] --> Bid3
-        Bid1: Alice encrypted(100)
-        Bid2: Bob encrypted(150)
-        Bid3: Carol encrypted(120)
-    }
+    C --> C1[Alice<br/>encrypted 100]
+    C --> C2[Bob<br/>encrypted 150]
+    C --> C3[Carol<br/>encrypted 120]
     
-    Sealed --> Reveal: Deadline reached
-    Reveal --> Winner
-    Winner: Bob wins (150)
-    Winner --> [*]
+    C1 & C2 & C3 --> D[Deadline Reached]
+    D --> E[Reveal Phase]
+    E --> F[Winner: Bob - 150]
     
-    note right of Sealed: CEE ensures:\nBids hidden until reveal\nNo bid sniping\nFair price discovery
+    style C fill:#9C27B0,color:#fff
+    style C1 fill:#FFE0B2
+    style C2 fill:#FFE0B2
+    style C3 fill:#FFE0B2
+    style F fill:#4CAF50,color:#fff
 ```
+
+**CEE ensures:**
+- ✅ Bids hidden until reveal
+- ✅ No bid sniping
+- ✅ Fair price discovery
 
 **Traditional NFT auction problem:**
 - Last-minute bid sniping
@@ -792,17 +795,19 @@ stateDiagram-v2
 #### MEV-Resistant DEX
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[User] -->|Encrypted Order| B[CEE Order Book]
     B -->|Hidden Amount| C[Matching Engine]
     C -->|Execute| D[Settlement]
     
-    E[MEV Searcher] -.-x B
-    E -.-x C
+    E[MEV Searcher]
+    E -.->|❌ Cannot see size| B
+    E -.->|❌ Cannot frontrun| C
     
     style B fill:#9C27B0,color:#fff
     style C fill:#FF5722,color:#fff
     style D fill:#4CAF50,color:#fff
+    style E fill:#ff6b6b,color:#fff
 ```
 
 **Traditional DEX:** Order sizes are public → MEV bots sandwich attack
