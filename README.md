@@ -125,7 +125,7 @@ graph LR
     style F fill:#FF5722
 ```
 
-**Result:** Critical applications—payroll, treasuries, auctions, regulated finance—cannot be built on public blockchains without unacceptable privacy compromises.
+**Result:** Critical applications payroll, treasuries, auctions, regulated finance cannot be built on public blockchains without unacceptable privacy compromises.
 
 ### Why Existing Solutions Fall Short
 
@@ -175,10 +175,10 @@ graph TB
 
 CEE does **not** mint tokens or store balances. Instead, it:
 
-- 🔐 **Orchestrates encrypted value flows** between confidential token accounts
-- 🧮 **Performs encrypted arithmetic** (addition, subtraction, comparison) without decryption
-- 🛡️ **Enforces economic rules** using encrypted conditionals—no branching on secret values
-- 🔑 **Controls decryption permissions** via on-chain allowance PDAs
+- **Orchestrates encrypted value flows** between confidential token accounts
+- **Performs encrypted arithmetic** (addition, subtraction, comparison) without decryption
+- **Enforces economic rules** using encrypted conditionals—no branching on secret values
+- **Controls decryption permissions** via on-chain allowance PDAs
 
 ### How CEE Enables Privacy-First Applications
 
@@ -538,37 +538,42 @@ CEE – Phase-5 Full E2E
 ### E2E Flow Visualization
 
 ```mermaid
-graph TB
+graph LR
     subgraph "Phase 1: Setup"
+        direction TB
         S1[Create Token Mint] --> S2[Create Token Accounts]
         S2 --> S3[Initialize FeeVault PDA]
     end
     
     subgraph "Phase 2: Collection"
-        C1[Alice encrypts 40 tokens] --> C2[collect_fee]
-        C2 --> C3[Transfer + e_add]
-        C3 --> C4[Bob encrypts 50 tokens]
+        direction TB
+        C1[Alice encrypts<br/>40 tokens] --> C2[collect_fee]
+        C2 --> C3[Transfer +<br/>e_add]
+        C3 --> C4[Bob encrypts<br/>50 tokens]
         C4 --> C5[collect_fee]
-        C5 --> C6[Total: encrypted 90]
+        C5 --> C6[Total:<br/>encrypted 90]
     end
     
     subgraph "Phase 3: Distribution"
-        D1[Authority encrypts 30 tokens] --> D2[distribute]
-        D2 --> D3[e_sub: remaining]
-        D3 --> D4[e_ge: can_distribute?]
-        D4 --> D5[e_select: clamp to available]
-        D5 --> D6[Transfer to Bob]
+        direction TB
+        D1[Authority encrypts<br/>30 tokens] --> D2[distribute]
+        D2 --> D3[e_sub:<br/>remaining]
+        D3 --> D4[e_ge:<br/>can_distribute?]
+        D4 --> D5[e_select:<br/>clamp]
+        D5 --> D6[Transfer<br/>to Bob]
     end
     
     subgraph "Phase 4: Access & Decrypt"
-        A1[grant_decrypt_access] --> A2[Create allowance PDA]
-        A2 --> A3[Bob calls decrypt]
-        A3 --> A4[Verify: 30 tokens]
+        direction TB
+        A1[grant_decrypt<br/>_access] --> A2[Create<br/>allowance PDA]
+        A2 --> A3[Bob calls<br/>decrypt]
+        A3 --> A4[Verify:<br/>30 tokens]
     end
     
     subgraph "Phase 5: Settlement"
-        E1[settle_epoch] --> E2[Reset handles]
-        E2 --> E3[Close vault]
+        direction TB
+        E1[settle_epoch] --> E2[Reset<br/>handles]
+        E2 --> E3[Close<br/>vault]
     end
     
     S3 --> C1
@@ -746,9 +751,13 @@ stateDiagram-v2
     Bidding --> Sealed: Bids encrypted
     
     state Sealed {
-        [*] --> Bid1: Alice: encrypted(100)
-        [*] --> Bid2: Bob: encrypted(150)
-        [*] --> Bid3: Carol: encrypted(120)
+        [*] --> Bid1
+        [*] --> Bid2
+        [*] --> Bid3
+        
+        Bid1: Alice encrypted(100)
+        Bid2: Bob encrypted(150)
+        Bid3: Carol encrypted(120)
     }
     
     Sealed --> Reveal: Deadline reached
@@ -788,8 +797,8 @@ flowchart LR
     B -->|Hidden Amount| C[Matching Engine]
     C -->|Execute| D[Settlement]
     
-    E[MEV Searcher] -.X.-|Can't see size| B
-    E -.X.-|Can't frontrun| C
+    E[MEV Searcher] -.->|❌ Can't see size| B
+    E -.->|❌ Can't frontrun| C
     
     style B fill:#9C27B0,color:#fff
     style C fill:#FF5722,color:#fff
