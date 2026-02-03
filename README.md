@@ -131,11 +131,11 @@ graph LR
 
 | Solution | What It Provides | What It Lacks |
 |----------|------------------|---------------|
-| **SPL Token** | Fast, composable transfers | ❌ Everything is public |
-| **Token-2022 Confidential** | Hidden balances | ❌ Economic logic still leaks |
-| **ZK-based protocols** | Cryptographic privacy | ❌ Heavy overhead, poor UX, complex integration |
-| **Off-chain computation** | Privacy through obscurity | ❌ Breaks composability, trust assumptions |
-| **Mixers/Tumblers** | Transaction unlinking | ❌ Limited use cases, regulatory concerns |
+| **SPL Token** | Fast, composable transfers | Everything is public |
+| **Token-2022 Confidential** | Hidden balances | Economic logic still leaks |
+| **ZK-based protocols** | Cryptographic privacy | Heavy overhead, poor UX, complex integration |
+| **Off-chain computation** | Privacy through obscurity | Breaks composability, trust assumptions |
+| **Mixers/Tumblers** | Transaction unlinking | Limited use cases, regulatory concerns |
 
 **What's missing:** A way to express **economic relationships**—fees, payouts, rewards, treasuries, pools—**without revealing the numbers behind them**, while maintaining **composability, verifiability, and Solana's performance**.
 
@@ -151,17 +151,17 @@ CEE is a **confidential economic coordination layer** built on Solana using **In
 graph TB
     subgraph "Traditional Approach"
         A1[Encrypted Balance] --> B1[Transfer]
-        B1 --> C1[❌ Amount Visible]
-        B1 --> D1[❌ Logic Leaks]
-        B1 --> E1[❌ Probing Possible]
+        B1 --> C1[Amount Visible]
+        B1 --> D1[Logic Leaks]
+        B1 --> E1[Probing Possible]
     end
     
     subgraph "CEE Approach"
         A2[Encrypted Balance] --> B2[CEE Orchestration]
-        B2 --> C2[✅ Amount Hidden]
-        B2 --> D2[✅ Logic Encrypted]
-        B2 --> E2[✅ Constant Time]
-        B2 --> F2[✅ Selective Decrypt]
+        B2 --> C2[Amount Hidden]
+        B2 --> D2[Logic Encrypted]
+        B2 --> E2[Constant Time]
+        B2 --> F2[Selective Decrypt]
     end
     
     style C1 fill:#ff6b6b
@@ -369,14 +369,14 @@ pub struct FeeVault {
 
 ```mermaid
 graph TB
-    subgraph "❌ Vulnerable Pattern"
+    subgraph "Vulnerable Pattern"
         V1[if encrypted_value > threshold]
         V1 --> V2[return Error]
         V1 --> V3[continue]
         V2 --> V4[Attacker learns: value ≤ threshold]
     end
     
-    subgraph "✅ CEE Pattern"
+    subgraph "CEE Pattern"
         C1[can_distribute = e_ge remaining, requested]
         C1 --> C2[actual = e_select can_distribute, requested, remaining]
         C2 --> C3[No branching - constant execution path]
@@ -389,7 +389,7 @@ graph TB
 
 **Vulnerable approach** (leaks information):
 ```rust
-// ❌ WRONG: Leaks information through control flow
+// WRONG: Leaks information through control flow
 if requested > available {
     return Err(InsufficientFunds);  // Attacker learns requested > available
 }
@@ -398,7 +398,7 @@ transfer(requested);  // Binary search attack possible
 
 **CEE approach** (constant-time, leak-free):
 ```rust
-// ✅ RIGHT: CEE uses encrypted selection (no branching)
+// RIGHT: CEE uses encrypted selection (no branching)
 let can_distribute = e_ge(remaining, requested)?;      // Encrypted comparison
 let actual = e_select(can_distribute, requested, remaining)?;  // No branching
 transfer(actual);  // Same execution path regardless of values
@@ -920,42 +920,6 @@ wallet = "~/.config/solana/id.json"
 confidential_economic_engine = "BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4"
 ```
 
----
-
-## 📁 Project Structure
-
-```
-confidential-economic-engine/
-├── programs/
-│   └── confidential-economic-engine/
-│       └── src/
-│           └── lib.rs              # Core CEE program (5 instructions)
-├── tests/
-│   └── confidential-economic-engine.ts  # Full E2E test suite
-├── target/
-│   ├── idl/                        # Generated IDL
-│   └── types/                      # TypeScript types
-├── docs/
-│   └── INCO_INTEGRATION_GUIDE.md   # Integration patterns
-├── E2E_TEST_GUIDE.md               # Test documentation
-├── E2E_TEST_ARCHITECTURE.md        # Architecture deep-dive
-└── README.md                       # You are here
-```
-
----
-
-## 🔧 Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Blockchain | Solana (Devnet) |
-| Smart Contract Framework | Anchor 0.31.1 |
-| Encrypted Compute | Inco Lightning 0.1.4 (FHE) |
-| Token Standard | Confidential Token-2022 |
-| Client Encryption | @inco/solana-sdk |
-| Testing | Mocha + Chai + TypeScript |
-
----
 
 ## 🗺️ Roadmap
 
@@ -1016,39 +980,11 @@ This is the missing layer between public blockchains and real-world financial sy
 
 **Vision:** CEE aims to become the standard **confidential economic primitive on Solana**, enabling a new class of privacy-first applications while maintaining the performance and composability that makes Solana unique.
 
----
 
-## 📚 Resources
-
-- [Inco Lightning Documentation](https://docs.inco.org/svm/overview)
-- [Inco Rust SDK](https://docs.inco.org/svm/rust-sdk/overview)
-- [Inco JavaScript SDK](https://docs.inco.org/svm/js-sdk/overview)
-- [Token-2022 Confidential Transfers](https://spl.solana.com/confidential-token)
-- [Anchor Framework](https://www.anchor-lang.com/)
-
----
-
-## 🤝 Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
----
 
 ## 👥 Team
 
-Built with 🔐 for the Solana ecosystem.
+Built with Inco for the Solana ecosystem.
 
 ---
 
