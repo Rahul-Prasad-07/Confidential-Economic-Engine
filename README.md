@@ -19,20 +19,6 @@
 
 ---
 
-## Table of Contents
-
-- [Why CEE Exists](#-why-cee-exists)
-- [The Problem](#-the-problem-economic-intent-leakage-in-web3)
-- [The Solution](#-the-solution-confidential-economic-engine)
-- [Architecture](#-architecture)
-- [Security Model](#-security-model-defense-against-information-leakage)
-- [What Was Built](#️-what-was-built)
-- [Real-World Applications](#-real-world-applications)
-- [Integration Guide](#-integration-guide)
-- [Quick Start](#-quick-start)
-- [Roadmap](#️-roadmap)
-
----
 
 ## Why CEE Exists
 
