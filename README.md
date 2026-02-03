@@ -19,7 +19,7 @@
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
 - [Why CEE Exists](#-why-cee-exists)
 - [The Problem](#-the-problem-economic-intent-leakage-in-web3)
@@ -34,7 +34,7 @@
 
 ---
 
-## 🎭 Why CEE Exists
+## Why CEE Exists
 
 ### The Fundamental Problem
 
@@ -64,7 +64,7 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ---
 
-## 🎯 The Problem: Economic Intent Leakage in Web3
+## The Problem: Economic Intent Leakage in Web3
 
 Blockchains provide **transparency by default**, but this creates a fundamental tension: **economic privacy is essential for real-world applications**, yet everything on-chain is public.
 
@@ -141,7 +141,7 @@ graph LR
 
 ---
 
-## 💡 The Solution: Confidential Economic Engine
+## The Solution: Confidential Economic Engine
 
 CEE is a **confidential economic coordination layer** built on Solana using **Inco Lightning** for Fully Homomorphic Encryption (FHE) operations.
 
@@ -201,7 +201,7 @@ flowchart LR
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### System Stack
 
@@ -305,7 +305,7 @@ graph LR
 
 ---
 
-## 🔐 Security Model: Defense Against Information Leakage
+## Security Model: Defense Against Information Leakage
 
 CEE prevents common confidentiality failures through four core design principles:
 
@@ -359,8 +359,8 @@ flowchart LR
 ```rust
 #[account]
 pub struct FeeVault {
-    pub total_fees_handle: u128,           // ✅ Encrypted handle, NOT plaintext
-    pub pending_distribution_handle: u128,  // ✅ Encrypted handle, NOT plaintext
+    pub total_fees_handle: u128,           // Encrypted handle, NOT plaintext
+    pub pending_distribution_handle: u128,  // Encrypted handle, NOT plaintext
     // No plaintext amounts anywhere
 }
 ```
@@ -464,7 +464,7 @@ graph LR
 
 ---
 
-## 🛠️ What Was Built
+## What Was Built
 
 ### Smart Contract Instructions
 
@@ -590,15 +590,15 @@ graph LR
 
 | What's Hidden | How CEE Protects It | Test Verification |
 |---------------|---------------------|-------------------|
-| Individual fee amounts | Client-side encryption | ✅ Only handles stored on-chain |
-| Total vault balance | Encrypted aggregation | ✅ `total_fees_handle` is u128, not plaintext |
-| Distribution amounts | Encrypted transfer | ✅ Transaction succeeds without revealing amount |
-| Clamping logic | No branching (e_select) | ✅ Same execution path if request > available |
-| Who can decrypt | Allowance PDA | ✅ Only Bob can decrypt after grant |
+| Individual fee amounts | Client-side encryption | Only handles stored on-chain |
+| Total vault balance | Encrypted aggregation | `total_fees_handle` is u128, not plaintext |
+| Distribution amounts | Encrypted transfer | Transaction succeeds without revealing amount |
+| Clamping logic | No branching (e_select) | Same execution path if request > available |
+| Who can decrypt | Allowance PDA | Only Bob can decrypt after grant |
 
 ---
 
-## 🌐 Real-World Applications
+## Real-World Applications
 
 CEE is a **reusable primitive** that enables confidential economic coordination across multiple verticals. Here's how different industries can leverage it:
 
@@ -642,7 +642,7 @@ mindmap
 
 ---
 
-### 💰 Payments & Payroll
+### Payments & Payroll
 
 #### Private Payroll Systems
 
@@ -675,13 +675,13 @@ flowchart TB
 
 | Use Case | Traditional Web3 | With CEE |
 |----------|------------------|----------|
-| Netflix-style streaming | ❌ Everyone sees payment amounts | ✅ Service verifies payment, amount private |
-| SaaS subscriptions | ❌ Competitors track customer spend | ✅ Payment confirmed, tier hidden |
-| Premium memberships | ❌ Whale identification easy | ✅ Membership verified, level private |
+| Netflix-style streaming | Everyone sees payment amounts | Service verifies payment, amount private |
+| SaaS subscriptions | Competitors track customer spend | Payment confirmed, tier hidden |
+| Premium memberships | Whale identification easy | Membership verified, level private |
 
 ---
 
-### 🏛️ DeFi & DAOs
+### DeFi & DAOs
 
 #### Confidential Treasuries
 
@@ -741,7 +741,7 @@ sequenceDiagram
 
 ---
 
-### 🎮 Gaming & Prediction Markets
+### Gaming & Prediction Markets
 
 #### Sealed-Bid Auctions
 
@@ -784,13 +784,13 @@ flowchart LR
 
 | Game Mechanic | Without CEE | With CEE |
 |---------------|-------------|----------|
-| Tournament prize | ❌ Pool size influences entry behavior | ✅ Hidden until distribution |
-| Loot box odds | ❌ Players game the system | ✅ Provably fair, unmanipulatable |
-| Player rankings | ❌ Full leaderboard | ✅ Know your rank, not others' scores |
+| Tournament prize | Pool size influences entry behavior | Hidden until distribution |
+| Loot box odds | Players game the system | Provably fair, unmanipulatable |
+| Player rankings | Full leaderboard | Know your rank, not others' scores |
 
 ---
 
-### 🏗️ Infrastructure & Compliance
+### Infrastructure & Compliance
 
 #### MEV-Resistant DEX
 
@@ -839,7 +839,7 @@ graph TB
 
 ---
 
-## 🧩 Integration Guide
+## Integration Guide
 
 ### For Protocol Developers
 
@@ -881,7 +881,7 @@ const plaintext = BigInt(result.plaintexts[0]);  // Your actual payout amount
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -921,9 +921,9 @@ confidential_economic_engine = "BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4"
 ```
 
 
-## 🗺️ Roadmap
+## Roadmap
 
-### Phase 1: Core Engine ✅
+### Phase 1: Core Engine 
 - [x] FeeVault initialization with encrypted handles
 - [x] Encrypted fee collection with aggregation
 - [x] Conditional distribution with clamping
@@ -950,7 +950,7 @@ confidential_economic_engine = "BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4"
 
 ---
 
-## 🔑 Key Takeaway
+## Key Takeaway
 
 ```mermaid
 graph LR
@@ -982,7 +982,7 @@ This is the missing layer between public blockchains and real-world financial sy
 
 
 
-## 👥 Team
+## Team
 
 Built with Inco for the Solana ecosystem.
 
