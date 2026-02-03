@@ -754,17 +754,17 @@ stateDiagram-v2
         [*] --> Bid1
         [*] --> Bid2
         [*] --> Bid3
-        
         Bid1: Alice encrypted(100)
         Bid2: Bob encrypted(150)
         Bid3: Carol encrypted(120)
     }
     
     Sealed --> Reveal: Deadline reached
-    Reveal --> Winner: Bob wins (150)
+    Reveal --> Winner
+    Winner: Bob wins (150)
     Winner --> [*]
     
-    note right of Sealed: CEE ensures:<br/>✅ Bids hidden until reveal<br/>✅ No bid sniping<br/>✅ Fair price discovery
+    note right of Sealed: CEE ensures:\nBids hidden until reveal\nNo bid sniping\nFair price discovery
 ```
 
 **Traditional NFT auction problem:**
@@ -797,8 +797,8 @@ flowchart LR
     B -->|Hidden Amount| C[Matching Engine]
     C -->|Execute| D[Settlement]
     
-    E[MEV Searcher] -.->|❌ Can't see size| B
-    E -.->|❌ Can't frontrun| C
+    E[MEV Searcher] -.-x B
+    E -.-x C
     
     style B fill:#9C27B0,color:#fff
     style C fill:#FF5722,color:#fff
