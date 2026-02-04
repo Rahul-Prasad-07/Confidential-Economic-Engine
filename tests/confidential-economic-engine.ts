@@ -7,13 +7,10 @@ import {
   Connection,
 } from "@solana/web3.js";
 import { expect } from "chai";
-
 import { encryptValue } from "@inco/solana-sdk";
-import { decrypt } from "@inco/solana-sdk";
+import { decrypt} from "@inco/solana-sdk";
 import { hexToBuffer } from "@inco/solana-sdk";
-
 import incoTokenIdl from "./idl/inco_token.json";
-
 import { ConfidentialEconomicEngine } from "../target/types/confidential_economic_engine";
 
 
