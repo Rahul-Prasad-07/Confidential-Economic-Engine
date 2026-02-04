@@ -28,7 +28,7 @@ const DECIMALS = 6;
 const INPUT_TYPE = 0; // ciphertext
 
 
-describe("CEE – Phase-5 Full E2E", () => {
+describe("CEE – Full E2E", () => {
  
   const network = process.env.SOLANA_NETWORK || "devnet";
   const rpcUrl = network === "devnet" 

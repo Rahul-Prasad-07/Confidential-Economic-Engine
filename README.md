@@ -887,10 +887,13 @@ cd Confidential-Economic-Engine
 yarn install
 
 # Build the program
-anchor build
+yarn build
 
-# Run tests (devnet)
-anchor test --provider.cluster devnet
+# Deploy to devnet
+yarn deploy
+
+# Run tests (without redeploying)
+yarn test
 ```
 
 ### Configuration
@@ -906,8 +909,24 @@ wallet = "~/.config/solana/id.json"
 confidential_economic_engine = "BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4"
 ```
 
+### Testing & Verification
 
-## Roadmap
+The test suite (`tests/confidential-economic-engine.ts`) verifies:
+
+- ✅ Confidential token mint and account initialization
+- ✅ Encrypted fee collection with aggregation
+- ✅ Conditional distribution with clamping logic
+- ✅ Decryption access control enforcement
+- ✅ Epoch settlement
+
+**Run tests:**
+```bash
+yarn test
+```
+
+**Expected output:** 9 passing tests in ~20 seconds
+
+---
 
 ### Phase 1: Core Engine 
 - [x] FeeVault initialization with encrypted handles
