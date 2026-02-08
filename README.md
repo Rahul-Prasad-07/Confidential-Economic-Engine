@@ -10,7 +10,7 @@
 
 <p align="center">
   <strong>A reusable, privacy-first economic coordination layer for Solana</strong><br>
-  <i>Enabling confidential payments, treasuries, and sealed economic flows using Inco Lightning FHE</i>
+  <i>Enabling confidential payments, treasuries, and sealed economic flows using Inco Lightning </i>
 </p>
 
 <p align="center">
