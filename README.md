@@ -52,76 +52,140 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ## How It Works: Complete Flow
 
-Here's the complete journey from encrypted token creation to private distribution:
+Here's the complete journey from encrypted token creation to private distribution - all 22 steps organized in rows:
 
 ```mermaid
-graph TB
-    subgraph row1 ["🟣 Row 1: Setup Phase"]
+graph LR
+    subgraph row1["Row 1: Setup Phase"]
         direction LR
-        S1["1️⃣ Create Token<br/>🪙<br/>Mint confidential<br/>token"]
-        S2["2️⃣ Token Accounts<br/>👤<br/>Create Alice<br/>Bob, Vault<br/>accounts"]
-        S3["3️⃣ Mint to Alice<br/>💰<br/>Alice gets<br/>encrypted 100<br/>tokens"]
-        S4["4️⃣ Init Vault<br/>🏦<br/>Create CEE<br/>FeeVault PDA"]
-        S1 --> S2 --> S3 --> S4
+        A1["🪙 Step 1<br/>Create<br/>Confidential<br/>Token"]
+        A2["👤 Step 2<br/>Create Token<br/>Accounts<br/>Alice|Bob|Vault"]
+        A3["💰 Step 3<br/>Mint to Alice<br/>encrypted<br/>100 tokens"]
+        A4["🏦 Step 4<br/>Initialize<br/>CEE Vault<br/>PDA"]
+        
+        A1 --> A2 --> A3 --> A4
     end
     
-    subgraph row2 ["🟠 Row 2: Alice Pays Fee"]
+    subgraph row2["Row 2: Alice Collects Fee"]
         direction LR
-        C1["5️⃣ Alice Encrypts<br/>🔐<br/>Encrypt 40<br/>tokens<br/>client-side"]
-        C2["6️⃣ Send to CEE<br/>📤<br/>Call collect_fee<br/>with encrypted<br/>bytes"]
-        C3["7️⃣ CEE Arithmetic<br/>➕<br/>e_add: 0+40<br/>encrypted"]
-        C4["8️⃣ Vault Update<br/>🏪<br/>Vault holds<br/>encrypted(40)"]
+        B1["🔐 Step 5<br/>Alice<br/>Encrypts<br/>40 tokens"]
+        B2["📤 Step 6<br/>Send to CEE<br/>collect_fee"]
+        B3["➕ Step 7<br/>CEE e_add<br/>0+40<br/>encrypted"]
+        B4["🏪 Step 8<br/>Vault holds<br/>encrypted 40"]
+        
+        B1 --> B2 --> B3 --> B4
+    end
+    
+    subgraph row3["Row 3: Bob Collects Fee"]
+        direction LR
+        C1["🔐 Step 9<br/>Bob<br/>Encrypts<br/>50 tokens"]
+        C2["📤 Step 10<br/>Send to CEE<br/>collect_fee"]
+        C3["➕ Step 11<br/>CEE e_add<br/>40+50<br/>encrypted"]
+        C4["🏪 Step 12<br/>Vault holds<br/>encrypted 90"]
+        
         C1 --> C2 --> C3 --> C4
     end
     
-    subgraph row3 ["🟠 Row 3: Bob Pays Fee"]
+    subgraph row4["Row 4: Distribution with Clamping"]
         direction LR
-        D1["9️⃣ Bob Encrypts<br/>🔐<br/>Encrypt 50<br/>tokens<br/>client-side"]
-        D2["🔟 Send to CEE<br/>📤<br/>Call collect_fee<br/>with encrypted<br/>bytes"]
-        D3["1️⃣1️⃣ CEE Arithmetic<br/>➕<br/>e_add: 40+50<br/>encrypted"]
-        D4["1️⃣2️⃣ Vault Update<br/>🏪<br/>Vault holds<br/>encrypted(90)"]
-        D1 --> D2 --> D3 --> D4
+        D1["🔐 Step 13<br/>Authority<br/>Encrypts<br/>request: 30"]
+        D2["📥 Step 14<br/>Send<br/>distribute<br/>call"]
+        D3["🔢 Step 15<br/>CEE Computes<br/>Encrypted:<br/>remaining=90"]
+        D4["🎯 Step 16<br/>CEE Selects<br/>actual=30<br/>No leakage"]
     end
     
-    subgraph row4 ["🔴 Row 4: Distribution"]
+    D1 --> D2 --> D3 --> D4
+    
+    subgraph row5["Row 5: Access Control and Decryption"]
         direction LR
-        E1["1️⃣3️⃣ Authority<br/>Encrypts<br/>🔐<br/>Encrypt request<br/>for 30 tokens"]
-        E2["1️⃣4️⃣ Call Distribute<br/>📥<br/>Invoke distribute<br/>instruction"]
-        E3["1️⃣5️⃣ CEE Computes<br/>🔢 ENCRYPTED:<br/>remaining = 90<br/>can_give?"]
-        E4["1️⃣6️⃣ CEE Selects<br/>🎯<br/>e_select: actual=30<br/>NO branching"]
-        E1 --> E2 --> E3 --> E4
+        E1["🔑 Step 17<br/>Authority<br/>Grants Bob<br/>Decrypt Access"]
+        E2["🔓 Step 18<br/>Bob Calls<br/>decrypt<br/>with handle"]
+        E3["✅ Step 19<br/>Covalidator<br/>Verifies<br/>Permission"]
+        E4["📖 Step 20<br/>Bob Sees<br/>Plaintext<br/>= 30 tokens"]
     end
     
-    subgraph row5 ["🔴 Row 5: Transfer & Access"]
+    E1 --> E2 --> E3 --> E4
+    
+    subgraph row6["Row 6: Settlement"]
         direction LR
-        F1["1️⃣7️⃣ Transfer Amount<br/>📤<br/>Send encrypted 30<br/>to Bob"]
-        F2["1️⃣8️⃣ Grant Permission<br/>🔑<br/>Create allowance<br/>for Bob"]
-        F3["1️⃣9️⃣ Bob Requests<br/>Decrypt<br/>🔓<br/>Sign decrypt<br/>request"]
-        F4["2️⃣0️⃣ Covalidator<br/>Checks<br/>✅<br/>Verify Bob has<br/>permission"]
-        F1 --> F2 --> F3 --> F4
+        F1["🔄 Step 21<br/>Authority<br/>Calls<br/>settle_epoch"]
+        F2["✨ Step 22<br/>Vault Reset<br/>Handles→0<br/>Ready"]
+        
+        F1 --> F2
     end
     
-    subgraph row6 ["🟢 Row 6: Verification & Closure"]
-        direction LR
-        G1["2️⃣1️⃣ Decrypt Result<br/>📖<br/>Bob sees:<br/>plaintext = 30"]
-        G2["2️⃣2️⃣ Verify Amount<br/>✅<br/>Bob confirms<br/>correct"]
-        G3["2️⃣3️⃣ Settlement<br/>🔄<br/>Settle Epoch<br/>reset handles"]
-        G4["2️⃣4️⃣ Vault Closed<br/>✨<br/>Ready for<br/>next cycle"]
-        G1 --> G2 --> G3 --> G4
+    A4 -.-> B1
+    B4 -.-> C1
+    C4 -.-> D1
+    D4 -.-> E1
+    E4 -.-> F1
+    
+    style row1 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#000
+    style row2 fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#000
+    style row3 fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px,color:#000
+    style row4 fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
+    style row5 fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
+    style row6 fill:#F1F8E9,stroke:#689F38,stroke-width:2px,color:#000
+```
+
+### Flow Summary:
+- **Row 1:** Setup - Token mint, accounts, vault initialization
+- **Row 2:** Alice encrypts 40 → CEE aggregates → Vault holds encrypted(40)
+- **Row 3:** Bob encrypts 50 → CEE aggregates → Vault holds encrypted(90)
+- **Row 4:** Authority requests 30 → CEE computes encrypted conditions → Selects 30 with NO information leakage
+- **Row 5:** Bob granted permission → Calls decrypt → Covalidator verifies → Bob sees plaintext 30
+- **Row 6:** Authority settles → Vault resets → Ready for next cycle
+
+---
+
+```mermaid
+graph LR
+    subgraph "1️⃣ Setup Phase"
+        A["🪙 Create<br/>Confidential Token"] --> B["👤 Create Token<br/>Accounts<br/>Alice | Bob | Vault"]
+        B --> C["💰 Mint to Alice<br/>encrypted 100 tokens"]
+        C --> D["🏦 Initialize<br/>CEE Vault"]
     end
     
-    S4 --> C1
-    C4 --> D1
-    D4 --> E1
-    E4 --> F1
-    F4 --> G1
+    subgraph "2️⃣ Collection Phase"
+        E["🔐 Alice Encrypts<br/>40 tokens"] --> F["📤 Send to CEE<br/>collect_fee"]
+        F --> G["➕ CEE e_add<br/>encrypted: 0+40"]
+        G --> H["🏪 Vault holds<br/>encrypted 40"]
+        
+        I["� Bob Encrypts<br/>50 tokens"] --> J["� Send to CEE<br/>collect_fee"]
+        J --> K["➕ CEE e_add<br/>encrypted: 40+50"]
+        K --> L["🏪 Vault holds<br/>encrypted 90"]
+    end
     
-    style S4 fill:#9C27B0,color:#fff
-    style C4 fill:#FF5722,color:#fff
-    style D4 fill:#FF5722,color:#fff
-    style E3 fill:#FF5722,color:#fff
-    style E4 fill:#FF5722,color:#fff
-    style G1 fill:#4CAF50,color:#fff
+    subgraph "3️⃣ Distribution Phase"
+        M["🔐 Authority<br/>Encrypts 30"] --> N["📥 Request<br/>distribute"]
+        N --> O["🔢 CEE computes<br/>ENCRYPTED:<br/>remaining = 90<br/>can_give = 90≥30"]
+        O --> P["🎯 CEE selects<br/>actual = 30"]
+        P --> Q["📤 Transfer 30<br/>to Bob encrypted"]
+    end
+    
+    subgraph "4️⃣ Verification Phase"
+        R["🔑 Authority grants<br/>Bob decrypt<br/>permission"] --> S["🔓 Bob calls<br/>decrypt"]
+        S --> T["✅ Covalidator<br/>verifies permission"]
+        T --> U["📖 Bob sees:<br/>plaintext = 30"]
+    end
+    
+    subgraph "5️⃣ Settlement"
+        V["🔄 Settle Epoch"]
+        V --> W["✨ Vault reset<br/>Ready for next cycle"]
+    end
+    
+    D --> E
+    H --> I
+    L --> M
+    Q --> R
+    U --> V
+    
+    style D fill:#9C27B0,color:#fff
+    style H fill:#FF5722,color:#fff
+    style L fill:#FF5722,color:#fff
+    style O fill:#FF5722,color:#fff
+    style P fill:#FF5722,color:#fff
+    style U fill:#4CAF50,color:#fff
 ```
 
 **Key Points:**
