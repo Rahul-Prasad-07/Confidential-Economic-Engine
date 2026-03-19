@@ -50,6 +50,69 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ---
 
+## 🚀 How It Works: Complete Flow
+
+Here's the complete journey from encrypted token creation to private distribution:
+
+```mermaid
+graph LR
+    subgraph "1️⃣ Setup Phase"
+        A["🪙 Create<br/>Confidential Token"] --> B["👤 Create Token<br/>Accounts<br/>Alice | Bob | Vault"]
+        B --> C["💰 Mint to Alice<br/>encrypted 100 tokens"]
+        C --> D["🏦 Initialize<br/>CEE Vault"]
+    end
+    
+    subgraph "2️⃣ Collection Phase"
+        E["🔐 Alice Encrypts<br/>40 tokens"] --> F["📤 Send to CEE<br/>collect_fee"]
+        F --> G["➕ CEE e_add<br/>encrypted: 0+40"]
+        G --> H["🏪 Vault holds<br/>encrypted 40"]
+        
+        I["🔐 Bob Encrypts<br/>50 tokens"] --> J["📤 Send to CEE<br/>collect_fee"]
+        J --> K["➕ CEE e_add<br/>encrypted: 40+50"]
+        K --> L["🏪 Vault holds<br/>encrypted 90"]
+    end
+    
+    subgraph "3️⃣ Distribution Phase"
+        M["🔐 Authority<br/>Encrypts 30"] --> N["📥 Request<br/>distribute"]
+        N --> O["🔢 CEE computes<br/>ENCRYPTED:<br/>remaining = 90<br/>can_give = 90≥30"]
+        O --> P["🎯 CEE selects<br/>actual = 30"]
+        P --> Q["📤 Transfer 30<br/>to Bob encrypted"]
+    end
+    
+    subgraph "4️⃣ Verification Phase"
+        R["🔑 Authority grants<br/>Bob decrypt<br/>permission"] --> S["🔓 Bob calls<br/>decrypt"]
+        S --> T["✅ Covalidator<br/>verifies permission"]
+        T --> U["📖 Bob sees:<br/>plaintext = 30"]
+    end
+    
+    subgraph "5️⃣ Settlement"
+        V["🔄 Settle Epoch"]
+        V --> W["✨ Vault reset<br/>Ready for next cycle"]
+    end
+    
+    D --> E
+    H --> I
+    L --> M
+    Q --> R
+    U --> V
+    
+    style D fill:#9C27B0,color:#fff
+    style H fill:#FF5722,color:#fff
+    style L fill:#FF5722,color:#fff
+    style O fill:#FF5722,color:#fff
+    style P fill:#FF5722,color:#fff
+    style U fill:#4CAF50,color:#fff
+```
+
+**Key Points:**
+- ✅ **Mint & Tokens managed by Inco Token-2022** (encrypted by default)
+- ✅ **CEE orchestrates operations** without ever seeing plaintext
+- ✅ **Encrypted arithmetic** (e_add, e_ge, e_select) happens in Inco's TEE
+- ✅ **Only Bob can decrypt** - access controlled via allowance PDAs
+- ✅ **No information leakage** - constant-time execution prevents attacks
+
+---
+
 ## The Problem: Economic Intent Leakage in Web3
 
 Blockchains provide **transparency by default**, but this creates a fundamental tension: **economic privacy is essential for real-world applications**, yet everything on-chain is public.
