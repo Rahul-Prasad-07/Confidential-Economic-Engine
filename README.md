@@ -52,91 +52,7 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ## How It Works: Complete Flow
 
-Here's the complete journey from encrypted token creation to private distribution - all 22 steps organized in rows:
-
-```mermaid
-graph LR
-    subgraph row1["Row 1: Setup Phase"]
-        direction LR
-        A1["🪙 Step 1<br/>Create<br/>Confidential<br/>Token"]
-        A2["👤 Step 2<br/>Create Token<br/>Accounts<br/>Alice|Bob|Vault"]
-        A3["💰 Step 3<br/>Mint to Alice<br/>encrypted<br/>100 tokens"]
-        A4["🏦 Step 4<br/>Initialize<br/>CEE Vault<br/>PDA"]
-        
-        A1 --> A2 --> A3 --> A4
-    end
-    
-    subgraph row2["Row 2: Alice Collects Fee"]
-        direction LR
-        B1["🔐 Step 5<br/>Alice<br/>Encrypts<br/>40 tokens"]
-        B2["📤 Step 6<br/>Send to CEE<br/>collect_fee"]
-        B3["➕ Step 7<br/>CEE e_add<br/>0+40<br/>encrypted"]
-        B4["🏪 Step 8<br/>Vault holds<br/>encrypted 40"]
-        
-        B1 --> B2 --> B3 --> B4
-    end
-    
-    subgraph row3["Row 3: Bob Collects Fee"]
-        direction LR
-        C1["🔐 Step 9<br/>Bob<br/>Encrypts<br/>50 tokens"]
-        C2["📤 Step 10<br/>Send to CEE<br/>collect_fee"]
-        C3["➕ Step 11<br/>CEE e_add<br/>40+50<br/>encrypted"]
-        C4["🏪 Step 12<br/>Vault holds<br/>encrypted 90"]
-        
-        C1 --> C2 --> C3 --> C4
-    end
-    
-    subgraph row4["Row 4: Distribution with Clamping"]
-        direction LR
-        D1["🔐 Step 13<br/>Authority<br/>Encrypts<br/>request: 30"]
-        D2["📥 Step 14<br/>Send<br/>distribute<br/>call"]
-        D3["🔢 Step 15<br/>CEE Computes<br/>Encrypted:<br/>remaining=90"]
-        D4["🎯 Step 16<br/>CEE Selects<br/>actual=30<br/>No leakage"]
-    end
-    
-    D1 --> D2 --> D3 --> D4
-    
-    subgraph row5["Row 5: Access Control and Decryption"]
-        direction LR
-        E1["🔑 Step 17<br/>Authority<br/>Grants Bob<br/>Decrypt Access"]
-        E2["🔓 Step 18<br/>Bob Calls<br/>decrypt<br/>with handle"]
-        E3["✅ Step 19<br/>Covalidator<br/>Verifies<br/>Permission"]
-        E4["📖 Step 20<br/>Bob Sees<br/>Plaintext<br/>= 30 tokens"]
-    end
-    
-    E1 --> E2 --> E3 --> E4
-    
-    subgraph row6["Row 6: Settlement"]
-        direction LR
-        F1["🔄 Step 21<br/>Authority<br/>Calls<br/>settle_epoch"]
-        F2["✨ Step 22<br/>Vault Reset<br/>Handles→0<br/>Ready"]
-        
-        F1 --> F2
-    end
-    
-    A4 -.-> B1
-    B4 -.-> C1
-    C4 -.-> D1
-    D4 -.-> E1
-    E4 -.-> F1
-    
-    style row1 fill:#E3F2FD,stroke:#1976D2,stroke-width:2px,color:#000
-    style row2 fill:#FCE4EC,stroke:#C2185B,stroke-width:2px,color:#000
-    style row3 fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px,color:#000
-    style row4 fill:#FFF3E0,stroke:#F57C00,stroke-width:2px,color:#000
-    style row5 fill:#E8F5E9,stroke:#388E3C,stroke-width:2px,color:#000
-    style row6 fill:#F1F8E9,stroke:#689F38,stroke-width:2px,color:#000
-```
-
-### Flow Summary:
-- **Row 1:** Setup - Token mint, accounts, vault initialization
-- **Row 2:** Alice encrypts 40 → CEE aggregates → Vault holds encrypted(40)
-- **Row 3:** Bob encrypts 50 → CEE aggregates → Vault holds encrypted(90)
-- **Row 4:** Authority requests 30 → CEE computes encrypted conditions → Selects 30 with NO information leakage
-- **Row 5:** Bob granted permission → Calls decrypt → Covalidator verifies → Bob sees plaintext 30
-- **Row 6:** Authority settles → Vault resets → Ready for next cycle
-
----
+Here's the complete journey from encrypted token creation to private distribution:
 
 ```mermaid
 graph LR
@@ -188,12 +104,16 @@ graph LR
     style U fill:#4CAF50,color:#fff
 ```
 
-**Key Points:**
-- ✅ **Mint & Tokens managed by Inco Token-2022** (encrypted by default)
-- ✅ **CEE orchestrates operations** without ever seeing plaintext
-- ✅ **Encrypted arithmetic** (e_add, e_ge, e_select) happens in Inco's TEE
-- ✅ **Only Bob can decrypt** - access controlled via allowance PDAs
-- ✅ **No information leakage** - constant-time execution prevents attacks
+**Complete Flow Summary:**
+
+| Phase | What | Privacy |
+|-------|------|---------|
+| **Setup** | Token mint & accounts | 🔐 Encrypted |
+| **Alice Pays (40)** | Encrypt, transfer, e_add | 🔐 Hidden |
+| **Bob Pays (50)** | Encrypt, transfer, e_add | 🔐 Hidden |
+| **Distribution (30)** | Encrypted conditions & transfer | 🔐 Hidden |
+| **Decrypt & Verify** | Bob authorized to decrypt | 🔐 Bob only |
+| **Settlement** | Reset vault | 🔐 Ready for next |
 
 ---
 
