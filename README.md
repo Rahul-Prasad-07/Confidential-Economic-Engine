@@ -50,69 +50,121 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ---
 
-## 🚀 How It Works: Complete Flow
+## How It Works: Complete Flow
 
 Here's the complete journey from encrypted token creation to private distribution:
 
 ```mermaid
-graph TD
-    subgraph "1️⃣ Setup Phase"
-        direction TB
-        A["🪙 Create<br/>Confidential Token"] --> B["👤 Create Token<br/>Accounts<br/>Alice | Bob | Vault"]
-        B --> C["💰 Mint to Alice<br/>encrypted 100 tokens"]
-        C --> D["🏦 Initialize<br/>CEE Vault"]
-    end
-    
-    subgraph "2️⃣ Collection Phase"
-        direction TB
-        E["🔐 Alice Encrypts<br/>40 tokens"] --> F["📤 Send to CEE<br/>collect_fee"]
-        F --> G["➕ CEE e_add<br/>encrypted: 0+40"]
-        G --> H["🏪 Vault holds<br/>encrypted 40"]
+graph TB
+    subgraph row1["ROW 1: Token & Vault Setup"]
+        direction LR
         
-        I["🔐 Bob Encrypts<br/>50 tokens"] --> J["📤 Send to CEE<br/>collect_fee"]
-        J --> K["➕ CEE e_add<br/>encrypted: 40+50"]
-        K --> L["🏪 Vault holds<br/>encrypted 90"]
+        subgraph step1["STEP 1: Create Token"]
+            A["🪙 Create<br/>Confidential Token"]
+        end
+        
+        subgraph step2["STEP 2: Create Accounts"]
+            B["👤 Alice Account"]
+            C["👤 Bob Account"]
+            D["🏦 Vault Account"]
+            B -..- C -..- D
+        end
+        
+        subgraph step3["STEP 3: Mint & Init"]
+            E["💰 Mint 100 to Alice<br/>encrypted"]
+            F["🏦 Initialize<br/>CEE Vault"]
+            E --> F
+        end
+        
+        step1 --> step2 --> step3
     end
     
-    subgraph "3️⃣ Distribution Phase"
-        direction TB
-        M["🔐 Authority<br/>Encrypts 30"] --> N["📥 Request<br/>distribute"]
-        N --> O["🔢 CEE computes<br/>ENCRYPTED:<br/>remaining = 90<br/>can_give = 90≥30"]
-        O --> P["🎯 CEE selects<br/>actual = 30"]
-        P --> Q["📤 Transfer 30<br/>to Bob encrypted"]
+    subgraph row2["ROW 2: Fee Collection"]
+        direction LR
+        
+        subgraph step4["STEP 4: Alice Pays Fee"]
+            G["🔐 Alice encrypts<br/>40 tokens"]
+            H["📤 Sends to CEE<br/>collect_fee"]
+            I["➕ CEE: e_add<br/>0 + 40"]
+            J["🏪 Vault: enc 40"]
+            G --> H --> I --> J
+        end
+        
+        subgraph step5["STEP 5: Bob Pays Fee"]
+            K["🔐 Bob encrypts<br/>50 tokens"]
+            L["📤 Sends to CEE<br/>collect_fee"]
+            M["➕ CEE: e_add<br/>40 + 50"]
+            N["🏪 Vault: enc 90"]
+            K --> L --> M --> N
+        end
+        
+        step4 --> step5
     end
     
-    subgraph "4️⃣ Verification Phase"
-        direction TB
-        R["🔑 Authority grants<br/>Bob decrypt<br/>permission"] --> S["🔓 Bob calls<br/>decrypt"]
-        S --> T["✅ Covalidator<br/>verifies permission"]
-        T --> U["📖 Bob sees:<br/>plaintext = 30"]
+    subgraph row3["ROW 3: Distribution & Verification"]
+        direction LR
+        
+        subgraph step6["STEP 6: Request Distribution"]
+            O["🔐 Authority<br/>encrypts 30"]
+            P["📥 Calls<br/>distribute"]
+            Q["🔢 CEE computes:<br/>remaining = 90<br/>90 ≥ 30 = true"]
+            R["🎯 Select: 30"]
+            S["📤 Transfer to Bob<br/>encrypted"]
+            O --> P --> Q --> R --> S
+        end
+        
+        subgraph step7["STEP 7: Decryption"]
+            T["🔑 Authority grants<br/>Bob permission"]
+            U["🔓 Bob calls<br/>decrypt"]
+            V["✅ Covalidator<br/>checks allowance"]
+            W["📖 Bob sees:<br/>plaintext = 30"]
+            T --> U --> V --> W
+        end
+        
+        step6 --> step7
     end
     
-    subgraph "5️⃣ Settlement"
-        direction TB
-        V["🔄 Settle Epoch"]
-        V --> W["✨ Vault reset<br/>Ready for next cycle"]
+    subgraph row4["ROW 4: Settlement"]
+        direction LR
+        
+        subgraph step8["STEP 8: Settle Epoch"]
+            X["🔄 Authority calls<br/>settle_epoch"]
+            Y["🔁 Reset handles<br/>total = 0"]
+            Z["✨ Vault closed<br/>Ready for next"]
+            X --> Y --> Z
+        end
+        
+        step8
     end
     
-    D --> E
-    H --> I
-    L --> M
-    Q --> R
-    U --> V
+    row1 --> row2
+    row2 --> row3
+    row3 --> row4
     
-    style D fill:#9C27B0,color:#fff
-    style H fill:#FF5722,color:#fff
-    style L fill:#FF5722,color:#fff
-    style O fill:#FF5722,color:#fff
-    style P fill:#FF5722,color:#fff
-    style U fill:#4CAF50,color:#fff
+    style step1 fill:#9C27B0,color:#fff,stroke:#fff,stroke-width:2px
+    style step2 fill:#2196F3,color:#fff,stroke:#fff,stroke-width:2px
+    style step3 fill:#FF5722,color:#fff,stroke:#fff,stroke-width:2px
+    style step4 fill:#FF5722,color:#fff,stroke:#fff,stroke-width:2px
+    style step5 fill:#FF5722,color:#fff,stroke:#fff,stroke-width:2px
+    style step6 fill:#FF9800,color:#fff,stroke:#fff,stroke-width:2px
+    style step7 fill:#4CAF50,color:#fff,stroke:#fff,stroke-width:2px
+    style step8 fill:#9C27B0,color:#fff,stroke:#fff,stroke-width:2px
 ```
-- ✅ **Mint & Tokens managed by Inco Token-2022** (encrypted by default)
-- ✅ **CEE orchestrates operations** without ever seeing plaintext
-- ✅ **Encrypted arithmetic** (e_add, e_ge, e_select) happens in Inco's TEE
-- ✅ **Only Bob can decrypt** - access controlled via allowance PDAs
-- ✅ **No information leakage** - constant-time execution prevents attacks
+
+**Phase Breakdown:**
+
+| Row | Phase | What Happens | Encryption |
+|-----|-------|-------------|-----------|
+| **1** | Setup | Create token, accounts, vault | Inco Token-2022 |
+| **2** | Collection | Alice pays 40, Bob pays 50 | e_add (encrypted addition) |
+| **3** | Distribution | Authority requests 30, CEE distributes with verification | e_ge, e_select (encrypted logic) |
+| **4** | Settlement | Reset vault for next cycle | None |
+
+**Key Security Features:**
+- ✅ **All amounts encrypted end-to-end**
+- ✅ **No branching on encrypted values** - constant execution path
+- ✅ **Selective decryption** - only authorized users see amounts
+- ✅ **Verifiable correctness** - covalidator attestation
 
 ---
 
