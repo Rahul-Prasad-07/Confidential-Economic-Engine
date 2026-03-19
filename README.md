@@ -55,14 +55,16 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 Here's the complete journey from encrypted token creation to private distribution:
 
 ```mermaid
-graph LR
+graph TD
     subgraph "1️⃣ Setup Phase"
+        direction TB
         A["🪙 Create<br/>Confidential Token"] --> B["👤 Create Token<br/>Accounts<br/>Alice | Bob | Vault"]
         B --> C["💰 Mint to Alice<br/>encrypted 100 tokens"]
         C --> D["🏦 Initialize<br/>CEE Vault"]
     end
     
     subgraph "2️⃣ Collection Phase"
+        direction TB
         E["🔐 Alice Encrypts<br/>40 tokens"] --> F["📤 Send to CEE<br/>collect_fee"]
         F --> G["➕ CEE e_add<br/>encrypted: 0+40"]
         G --> H["🏪 Vault holds<br/>encrypted 40"]
@@ -73,6 +75,7 @@ graph LR
     end
     
     subgraph "3️⃣ Distribution Phase"
+        direction TB
         M["🔐 Authority<br/>Encrypts 30"] --> N["📥 Request<br/>distribute"]
         N --> O["🔢 CEE computes<br/>ENCRYPTED:<br/>remaining = 90<br/>can_give = 90≥30"]
         O --> P["🎯 CEE selects<br/>actual = 30"]
@@ -80,12 +83,14 @@ graph LR
     end
     
     subgraph "4️⃣ Verification Phase"
+        direction TB
         R["🔑 Authority grants<br/>Bob decrypt<br/>permission"] --> S["🔓 Bob calls<br/>decrypt"]
         S --> T["✅ Covalidator<br/>verifies permission"]
         T --> U["📖 Bob sees:<br/>plaintext = 30"]
     end
     
     subgraph "5️⃣ Settlement"
+        direction TB
         V["🔄 Settle Epoch"]
         V --> W["✨ Vault reset<br/>Ready for next cycle"]
     end
@@ -103,8 +108,6 @@ graph LR
     style P fill:#FF5722,color:#fff
     style U fill:#4CAF50,color:#fff
 ```
-
-**Key Points:**
 - ✅ **Mint & Tokens managed by Inco Token-2022** (encrypted by default)
 - ✅ **CEE orchestrates operations** without ever seeing plaintext
 - ✅ **Encrypted arithmetic** (e_add, e_ge, e_select) happens in Inco's TEE
