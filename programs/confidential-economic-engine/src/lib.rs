@@ -1,15 +1,4 @@
 use anchor_lang::prelude::*;
-use inco_lightning::cpi::{e_add, e_sub, e_ge, e_select, new_euint128};
-use inco_lightning::types::Euint128;
-use inco_lightning::cpi::accounts::Operation;
-use inco_lightning::ID as INCO_LIGHTNING_ID;
-use inco_lightning::cpi::accounts::Allow;
-use inco_lightning::cpi::allow;
-
-use inco_token::cpi::accounts::TransferChecked;
-use inco_token::cpi::transfer_checked;
-
-
 
 declare_id!("BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4");
 
@@ -17,334 +6,440 @@ declare_id!("BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4");
 pub mod confidential_economic_engine {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-       
-       let vault = &mut ctx.accounts.fee_vault;
+    pub fn initialize_desk(
+        ctx: Context<InitializeDesk>,
+        max_notional_per_execution: u64,
+        max_slippage_bps: u16,
+        daily_notional_cap: u64,
+    ) -> Result<()> {
+        require!(max_slippage_bps <= 10_000, ErrorCode::InvalidSlippageBps);
+        require!(
+            max_notional_per_execution <= daily_notional_cap,
+            ErrorCode::InvalidPolicyBounds
+        );
 
-       vault.authority = ctx.accounts.authority.key();
-       vault.token_mint =  ctx.accounts.token_mint.key();
-       vault.vault_token_account =  ctx.accounts.vault_token_account.key();
-       vault.total_fees_handle = 0u128;
-       vault.pending_distribution_handle = 0u128;
-       vault.is_closed = false;
-       vault.bump = ctx.bumps.fee_vault;
-       Ok(())
-
+        let desk = &mut ctx.accounts.desk_config;
+        desk.authority = ctx.accounts.authority.key();
+        desk.max_notional_per_execution = max_notional_per_execution;
+        desk.max_slippage_bps = max_slippage_bps;
+        desk.daily_notional_cap = daily_notional_cap;
+        desk.consumed_today = 0;
+        desk.current_day_index = day_index(Clock::get()?.unix_timestamp);
+        desk.last_settlement_id = 0;
+        desk.halted = false;
+        desk.bump = ctx.bumps.desk_config;
+        Ok(())
     }
 
-    pub fn collect_fee(
-        ctx: Context<CollectFee>,
-        encrypted_amount: Vec<u8>,
-        decimals: u8,
-    ) -> Result<()>{
-
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_token_program.to_account_info(),
-            TransferChecked {
-                source: ctx.accounts.from_token.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                destination: ctx.accounts.vault_token_account.to_account_info(),
-                authority: ctx.accounts.payer.to_account_info(),
-                inco_lightning_program: ctx.accounts.inco_lightning_program.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-            }
+    pub fn update_policy(
+        ctx: Context<UpdatePolicy>,
+        max_notional_per_execution: u64,
+        max_slippage_bps: u16,
+        daily_notional_cap: u64,
+    ) -> Result<()> {
+        require!(max_slippage_bps <= 10_000, ErrorCode::InvalidSlippageBps);
+        require!(
+            max_notional_per_execution <= daily_notional_cap,
+            ErrorCode::InvalidPolicyBounds
         );
 
-        msg!("Transferring fee to vault...");
+        let desk = &mut ctx.accounts.desk_config;
+        desk.max_notional_per_execution = max_notional_per_execution;
+        desk.max_slippage_bps = max_slippage_bps;
+        desk.daily_notional_cap = daily_notional_cap;
+        Ok(())
+    }
 
-        transfer_checked(
-            cpi_ctx,
-            encrypted_amount.clone(),
-            0,
-            decimals,
-        )?;
+    pub fn set_halt(ctx: Context<SetHalt>, halted: bool) -> Result<()> {
+        ctx.accounts.desk_config.halted = halted;
+        Ok(())
+    }
 
-        msg!("transfer complete.");
+    pub fn open_private_intent(
+        ctx: Context<OpenPrivateIntent>,
+        session_id: u64,
+        intent_commitment: [u8; 32],
+        requested_notional_cap: u64,
+        requested_slippage_bps: u16,
+    ) -> Result<()> {
+        let clock = Clock::get()?;
+        let desk = &ctx.accounts.desk_config;
 
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation {
-                signer: ctx.accounts.payer.to_account_info(),
-            },
+        require!(!desk.halted, ErrorCode::DeskHalted);
+        require!(
+            requested_notional_cap <= desk.max_notional_per_execution,
+            ErrorCode::NotionalAboveDeskPolicy
+        );
+        require!(
+            requested_slippage_bps <= desk.max_slippage_bps,
+            ErrorCode::SlippageAboveDeskPolicy
         );
 
-        msg!("Creating encrypted amount...");
+        let session = &mut ctx.accounts.intent_session;
+        session.desk = desk.key();
+        session.agent = ctx.accounts.agent.key();
+        session.session_id = session_id;
+        session.intent_commitment = intent_commitment;
+        session.quote_commitment = [0u8; 32];
+        session.requested_notional_cap = requested_notional_cap;
+        session.requested_slippage_bps = requested_slippage_bps;
+        session.settlement_amount = 0;
+        session.realized_slippage_bps = 0;
+        session.settlement_ref = [0u8; 32];
+        session.status = SessionStatus::Open as u8;
+        session.cancel_reason = 0;
+        session.created_at = clock.unix_timestamp;
+        session.updated_at = clock.unix_timestamp;
+        session.bump = ctx.bumps.intent_session;
 
-        let amount: Euint128 = new_euint128(cpi_ctx, encrypted_amount, 0)?;
-
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation {
-                signer: ctx.accounts.payer.to_account_info(),
-            },
-        );
-        msg!("Adding to total fees...");
-
-        let updated_total = e_add(cpi_ctx, 
-            Euint128(ctx.accounts.fee_vault.total_fees_handle),
-            amount,
-            0
-        )?;
-        
-
-        ctx.accounts.fee_vault.total_fees_handle = updated_total.0;
+        emit!(PrivateIntentOpened {
+            desk: desk.key(),
+            session: session.key(),
+            agent: ctx.accounts.agent.key(),
+            session_id,
+            opened_at: clock.unix_timestamp,
+        });
 
         Ok(())
     }
 
-
-    pub fn distribute(
-        ctx: Context<Distribute>,
-        encrypted_requested: Vec<u8>,
-        decimals: u8,
-    ) -> Result<()>{
-
-
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
+    pub fn submit_private_quote(
+        ctx: Context<SubmitPrivateQuote>,
+        _session_id: u64,
+        quote_commitment: [u8; 32],
+    ) -> Result<()> {
+        let session = &mut ctx.accounts.intent_session;
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            session.status == SessionStatus::Open as u8,
+            ErrorCode::InvalidSessionState
         );
 
-        let requested : Euint128 = new_euint128(cpi_ctx, encrypted_requested.clone(), 0)?;
+        session.quote_commitment = quote_commitment;
+        session.status = SessionStatus::Quoted as u8;
+        session.updated_at = now;
 
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
-        );
-
-        let remaining = e_sub(
-            cpi_ctx,
-            Euint128(ctx.accounts.fee_vault.total_fees_handle),
-            Euint128(ctx.accounts.fee_vault.pending_distribution_handle),
-            0
-        )?;
-
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
-        );
-
-        let can_distribute = e_ge(
-            cpi_ctx,
-            remaining,
-            requested,
-            0
-        )?;
-
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
-        );
-
-        let actual = e_select(
-            cpi_ctx,
-            can_distribute,
-            requested,
-            remaining,
-            0
-        )?;
-
-        let token_cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_token_program.to_account_info(),
-            TransferChecked {
-                source: ctx.accounts.vault_token_account.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                destination: ctx.accounts.recipient_token_account.to_account_info(),
-                authority: ctx.accounts.authority.to_account_info(),
-                inco_lightning_program: ctx.accounts.inco_lightning_program.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-            }   
-        );
-
-        transfer_checked(
-            token_cpi_ctx,
-            encrypted_requested,
-            0,
-            decimals,
-        )?;
-        
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.inco_lightning_program.to_account_info(),
-            Operation{
-                signer: ctx.accounts.authority.to_account_info(),
-            }
-        );
-
-
-        let new_pending = e_add(
-            cpi_ctx,
-            Euint128(ctx.accounts.fee_vault.pending_distribution_handle),
-            actual,
-            0,
-        )?;
-
-        ctx.accounts.fee_vault.pending_distribution_handle = new_pending.0;
+        emit!(PrivateQuoteSubmitted {
+            desk: session.desk,
+            session: session.key(),
+            session_id: session.session_id,
+            quoted_at: now,
+        });
 
         Ok(())
     }
 
-    pub fn settle_epoch(ctx: Context<SettleEpoch>) -> Result<()> {
-        ctx.accounts.fee_vault.total_fees_handle = 0;
-        ctx.accounts.fee_vault.pending_distribution_handle = 0;
-        ctx.accounts.fee_vault.is_closed = true;
+    pub fn settle_private_execution(
+        ctx: Context<SettlePrivateExecution>,
+        _session_id: u64,
+        settlement_amount: u64,
+        realized_slippage_bps: u16,
+        settlement_ref: [u8; 32],
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let current_day = day_index(now);
+
+        let desk = &mut ctx.accounts.desk;
+        require!(!desk.halted, ErrorCode::DeskHalted);
+
+        let session = &mut ctx.accounts.intent_session;
+        require!(
+            session.status == SessionStatus::Quoted as u8,
+            ErrorCode::InvalidSessionState
+        );
+        require!(
+            settlement_amount <= session.requested_notional_cap,
+            ErrorCode::SettlementAboveSessionCap
+        );
+        require!(
+            realized_slippage_bps <= session.requested_slippage_bps,
+            ErrorCode::SlippageAboveSessionPolicy
+        );
+        require!(
+            realized_slippage_bps <= desk.max_slippage_bps,
+            ErrorCode::SlippageAboveDeskPolicy
+        );
+
+        if desk.current_day_index != current_day {
+            desk.current_day_index = current_day;
+            desk.consumed_today = 0;
+        }
+
+        let updated_consumed = desk
+            .consumed_today
+            .checked_add(settlement_amount)
+            .ok_or(ErrorCode::MathOverflow)?;
+        require!(
+            updated_consumed <= desk.daily_notional_cap,
+            ErrorCode::DailyCapExceeded
+        );
+
+        desk.consumed_today = updated_consumed;
+        desk.last_settlement_id = desk
+            .last_settlement_id
+            .checked_add(1)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        session.settlement_amount = settlement_amount;
+        session.realized_slippage_bps = realized_slippage_bps;
+        session.settlement_ref = settlement_ref;
+        session.status = SessionStatus::Settled as u8;
+        session.updated_at = now;
+
+        emit!(PrivateExecutionSettled {
+            desk: desk.key(),
+            session: session.key(),
+            settlement_id: desk.last_settlement_id,
+            session_id: session.session_id,
+            settled_at: now,
+        });
+
         Ok(())
     }
 
-    pub fn grant_decrypt_access(
-    ctx: Context<GrantDecryptAccess>,
-    handle: u128,
-) -> Result<()> {
+    pub fn cancel_session(
+        ctx: Context<CancelSession>,
+        _session_id: u64,
+        reason_code: u16,
+    ) -> Result<()> {
+        let session = &mut ctx.accounts.intent_session;
+        require!(
+            session.status == SessionStatus::Open as u8
+                || session.status == SessionStatus::Quoted as u8,
+            ErrorCode::InvalidSessionState
+        );
 
-    let cpi_ctx = CpiContext::new(
-        ctx.accounts.inco_lightning_program.to_account_info(),
-        Allow {
-            allowance_account: ctx.accounts.allowance_account.to_account_info(),
-            signer: ctx.accounts.authority.to_account_info(),
-            allowed_address: ctx.accounts.allowed_address.to_account_info(),
-            system_program: ctx.accounts.system_program.to_account_info(),
-        },
-    );
+        session.status = SessionStatus::Canceled as u8;
+        session.cancel_reason = reason_code;
+        session.updated_at = Clock::get()?.unix_timestamp;
 
-    // grant = true
-    allow(cpi_ctx, handle, true, ctx.accounts.allowed_address.key())?;
+        emit!(PrivateExecutionCanceled {
+            desk: session.desk,
+            session: session.key(),
+            session_id: session.session_id,
+            canceled_at: session.updated_at,
+            reason_code,
+        });
 
-    Ok(())
+        Ok(())
+    }
 }
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+pub enum SessionStatus {
+    Open = 1,
+    Quoted = 2,
+    Settled = 3,
+    Canceled = 4,
 }
 
 #[derive(Accounts)]
-pub struct Initialize <'info>{
-    
+pub struct InitializeDesk<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
-   
-    /// CHECK: Token mint for which the fee vault is being created
-    pub token_mint: AccountInfo<'info>,
-    
-    /// CHECK: Token account that will hold the fees
-    pub vault_token_account: AccountInfo<'info>,
-    
-    
     #[account(
         init,
         payer = authority,
-        space = 8 + std::mem::size_of::<FeeVault>(),
-        seeds = [b"fee_vault", token_mint.key().as_ref()],
+        space = 8 + DeskConfig::LEN,
+        seeds = [b"desk_config", authority.key().as_ref()],
         bump,
     )]
-    pub fee_vault: Account<'info, FeeVault>,
-    
-
+    pub desk_config: Account<'info, DeskConfig>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct CollectFee<'info> {
-    
-    #[account(mut)]
-    pub payer : Signer<'info>,
-    
-    #[account(mut)]
-    pub fee_vault: Account<'info, FeeVault>,
-    
-    /// CHECK: Token account from which fees are collected
-    #[account(mut)]
-    pub from_token: AccountInfo<'info>,
-    
-    /// CHECK: Token account to which fees are sent
-    #[account(mut)]
-    pub vault_token_account: AccountInfo<'info>,
-
-    /// CHECK: Token mint for which fees are being collected
-    #[account(mut)]
-    pub token_mint: AccountInfo<'info>,
-    
-    /// CHECK: Inco Token program for token transfers
-    pub inco_token_program: AccountInfo<'info>,
-    
-
-    /// CHECK: Inco Lightning program for encrypted operations
-    #[account(address = INCO_LIGHTNING_ID)]
-    pub inco_lightning_program: AccountInfo<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Distribute<'info>{
-
+pub struct UpdatePolicy<'info> {
     pub authority: Signer<'info>,
-    
-    /// CHECK: Fee vault from which fees are distributed
     #[account(mut, has_one = authority)]
-    pub fee_vault: Account<'info, FeeVault>,
-    
-    /// CHECK: Token account from which fees are distributed
-    #[account(mut)]
-    pub vault_token_account: AccountInfo<'info>,
-    
-    /// CHECK: Token mint for which fees are being distributed
-    #[account(mut)]
-    pub recipient_token_account: AccountInfo<'info>,
-
-    /// CHECK
-    pub token_mint: AccountInfo<'info>,
-
-    /// CHECK
-    pub inco_token_program: AccountInfo<'info>,
-
-    /// CHECK: Inco Lightning program for encrypted operations
-    #[account(address = INCO_LIGHTNING_ID)]
-    pub inco_lightning_program: AccountInfo<'info>,
-
-    pub system_program: Program<'info, System>,
-
+    pub desk_config: Account<'info, DeskConfig>,
 }
 
 #[derive(Accounts)]
-pub struct GrantDecryptAccess<'info> {
+pub struct SetHalt<'info> {
     pub authority: Signer<'info>,
-
-    /// CHECK: PDA derived from [handle, allowed_address]
-    #[account(mut)]
-    pub allowance_account: AccountInfo<'info>,
-
-    /// CHECK: Who can decrypt
-    pub allowed_address: AccountInfo<'info>,
-
-    /// CHECK
-    #[account(address = INCO_LIGHTNING_ID)]
-    pub inco_lightning_program: AccountInfo<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-
-
-#[derive(Accounts)]
-pub struct SettleEpoch<'info> {
-    pub authority: Signer<'info>,
-
     #[account(mut, has_one = authority)]
-    pub fee_vault: Account<'info, FeeVault>,
+    pub desk_config: Account<'info, DeskConfig>,
 }
 
+#[derive(Accounts)]
+#[instruction(session_id: u64)]
+pub struct OpenPrivateIntent<'info> {
+    pub agent: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub desk_config: Account<'info, DeskConfig>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + IntentSession::LEN,
+        seeds = [
+            b"intent_session",
+            desk_config.key().as_ref(),
+            &session_id.to_le_bytes()
+        ],
+        bump
+    )]
+    pub intent_session: Account<'info, IntentSession>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(session_id: u64)]
+pub struct SubmitPrivateQuote<'info> {
+    pub authority: Signer<'info>,
+    #[account(has_one = authority)]
+    pub desk: Account<'info, DeskConfig>,
+    #[account(
+        mut,
+        seeds = [
+            b"intent_session",
+            desk.key().as_ref(),
+            &session_id.to_le_bytes()
+        ],
+        bump = intent_session.bump,
+        has_one = desk
+    )]
+    pub intent_session: Account<'info, IntentSession>,
+}
+
+#[derive(Accounts)]
+#[instruction(session_id: u64)]
+pub struct SettlePrivateExecution<'info> {
+    pub authority: Signer<'info>,
+    #[account(mut, has_one = authority)]
+    pub desk: Account<'info, DeskConfig>,
+    #[account(
+        mut,
+        seeds = [
+            b"intent_session",
+            desk.key().as_ref(),
+            &session_id.to_le_bytes()
+        ],
+        bump = intent_session.bump,
+        has_one = desk
+    )]
+    pub intent_session: Account<'info, IntentSession>,
+}
+
+#[derive(Accounts)]
+#[instruction(session_id: u64)]
+pub struct CancelSession<'info> {
+    pub authority: Signer<'info>,
+    #[account(has_one = authority)]
+    pub desk: Account<'info, DeskConfig>,
+    #[account(
+        mut,
+        seeds = [
+            b"intent_session",
+            desk.key().as_ref(),
+            &session_id.to_le_bytes()
+        ],
+        bump = intent_session.bump,
+        has_one = desk
+    )]
+    pub intent_session: Account<'info, IntentSession>,
+}
 
 #[account]
-pub struct FeeVault {
+pub struct DeskConfig {
     pub authority: Pubkey,
-    pub token_mint: Pubkey,
-    pub vault_token_account: Pubkey,
-    pub total_fees_handle: u128,  // encrypted total fees collected handle as u128, not Euint128
-    pub pending_distribution_handle: u128, // encrypted pending distribution handle as u128, not Euint128
-    pub is_closed: bool,
+    pub max_notional_per_execution: u64,
+    pub max_slippage_bps: u16,
+    pub daily_notional_cap: u64,
+    pub consumed_today: u64,
+    pub current_day_index: i64,
+    pub last_settlement_id: u64,
+    pub halted: bool,
     pub bump: u8,
+}
+
+impl DeskConfig {
+    pub const LEN: usize = 32 + 8 + 2 + 8 + 8 + 8 + 8 + 1 + 1;
+}
+
+#[account]
+pub struct IntentSession {
+    pub desk: Pubkey,
+    pub agent: Pubkey,
+    pub session_id: u64,
+    pub intent_commitment: [u8; 32],
+    pub quote_commitment: [u8; 32],
+    pub requested_notional_cap: u64,
+    pub requested_slippage_bps: u16,
+    pub settlement_amount: u64,
+    pub realized_slippage_bps: u16,
+    pub settlement_ref: [u8; 32],
+    pub status: u8,
+    pub cancel_reason: u16,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub bump: u8,
+}
+
+impl IntentSession {
+    pub const LEN: usize = 32 + 32 + 8 + 32 + 32 + 8 + 2 + 8 + 2 + 32 + 1 + 2 + 8 + 8 + 1;
+}
+
+#[event]
+pub struct PrivateIntentOpened {
+    pub desk: Pubkey,
+    pub session: Pubkey,
+    pub agent: Pubkey,
+    pub session_id: u64,
+    pub opened_at: i64,
+}
+
+#[event]
+pub struct PrivateQuoteSubmitted {
+    pub desk: Pubkey,
+    pub session: Pubkey,
+    pub session_id: u64,
+    pub quoted_at: i64,
+}
+
+#[event]
+pub struct PrivateExecutionSettled {
+    pub desk: Pubkey,
+    pub session: Pubkey,
+    pub settlement_id: u64,
+    pub session_id: u64,
+    pub settled_at: i64,
+}
+
+#[event]
+pub struct PrivateExecutionCanceled {
+    pub desk: Pubkey,
+    pub session: Pubkey,
+    pub session_id: u64,
+    pub canceled_at: i64,
+    pub reason_code: u16,
+}
+
+#[error_code]
+pub enum ErrorCode {
+    #[msg("Invalid slippage bps value")]
+    InvalidSlippageBps,
+    #[msg("Policy max notional must be <= daily cap")]
+    InvalidPolicyBounds,
+    #[msg("Desk is halted")]
+    DeskHalted,
+    #[msg("Requested notional exceeds desk policy")]
+    NotionalAboveDeskPolicy,
+    #[msg("Requested slippage exceeds desk policy")]
+    SlippageAboveDeskPolicy,
+    #[msg("Session is not in a valid state for this operation")]
+    InvalidSessionState,
+    #[msg("Settlement amount exceeds session notional cap")]
+    SettlementAboveSessionCap,
+    #[msg("Settlement slippage exceeds session policy")]
+    SlippageAboveSessionPolicy,
+    #[msg("Daily notional cap exceeded")]
+    DailyCapExceeded,
+    #[msg("Arithmetic overflow")]
+    MathOverflow,
+}
+
+fn day_index(unix_ts: i64) -> i64 {
+    unix_ts.div_euclid(86_400)
 }

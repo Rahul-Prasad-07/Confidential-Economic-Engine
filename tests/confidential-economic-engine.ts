@@ -1,299 +1,239 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Program } from "@coral-xyz/anchor";
-import {
-  Keypair,
-  PublicKey,
-  SystemProgram,
-  Connection,
-} from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { expect } from "chai";
-import { encryptValue } from "@inco/solana-sdk";
-import { decrypt} from "@inco/solana-sdk";
-import { hexToBuffer } from "@inco/solana-sdk";
-import incoTokenIdl from "./idl/inco_token.json";
-import { ConfidentialEconomicEngine } from "../target/types/confidential_economic_engine";
+import { createHash } from "crypto";
+import BN from "bn.js";
 
-
-
-const CONFIDENTIAL_TOKEN_2022_PROGRAM_ID = new PublicKey(
-  "9y5V6sxRGNGCEWETbfuZFjpZPFn7CRCSrcn5rgZbCvSn"
-);
-
-// usually auto-filled by Anchor, kept explicit for clarity
-const INCO_LIGHTNING_PROGRAM_ID =
-  new PublicKey("5sjEbPiqgZrYwR31ahR6Uk9wf5awoX61YGg7jExQSwaj");
-
-
-const DECIMALS = 6;
-const INPUT_TYPE = 0; // ciphertext
-
-
-describe("CEE – Full E2E", () => {
- 
-  const network = process.env.SOLANA_NETWORK || "devnet";
-  const rpcUrl = network === "devnet" 
-    ? "https://api.devnet.solana.com" 
-    : "http://localhost:8899";
-  const connection = new Connection(rpcUrl, "confirmed");
-
-  const provider = new anchor.AnchorProvider(
-    connection,
-    anchor.AnchorProvider.env().wallet,
-    { commitment: "confirmed" }
-  );
+describe("MagicBlock Privacy Desk - program", () => {
+  const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const incoTokenProgram = new anchor.Program(
-    incoTokenIdl as anchor.Idl,
-    provider
-  )as any;
-
-  const program = anchor.workspace
-    .ConfidentialEconomicEngine as Program<ConfidentialEconomicEngine>;
+  const program: any = anchor.workspace.ConfidentialEconomicEngine;
 
   const authority = provider.wallet as anchor.Wallet;
+  const agent = authority.payer;
 
+  let deskConfig: PublicKey;
+  let intentSessionOne: PublicKey;
+  let intentSessionTwo: PublicKey;
 
-  const alice = Keypair.generate();
-  const bob = Keypair.generate();
+  const sessionBase = Math.floor(Date.now() / 1000);
+  const SESSION_ID_ONE = new BN(sessionBase * 10 + 1);
+  const SESSION_ID_TWO = new BN(sessionBase * 10 + 2);
 
-  let mintKp: Keypair;
+  const commitment = (value: string) =>
+    Array.from(createHash("sha256").update(value).digest()) as number[];
 
-  let aliceTokenKp: Keypair;
-  let vaultTokenKp: Keypair;
-  let bobTokenKp: Keypair;
-
-  let feeVault: PublicKey;
-
- async function airdrop(pubkey: PublicKey) {
-    const signature = await connection.requestAirdrop(
-      pubkey,
-      2 * anchor.web3.LAMPORTS_PER_SOL
-    );
-    await connection.confirmTransaction({
-      signature,
-      blockhash: (await connection.getLatestBlockhash()).blockhash,
-      lastValidBlockHeight: (await connection.getLatestBlockhash()).lastValidBlockHeight,
-    });
-  }
-
-  async function initTokenAccount(kp: Keypair, ownerKp: Keypair) {
-    await incoTokenProgram.methods
-      .initializeAccount3()
-      .accounts({
-        account: kp.publicKey,
-        mint: mintKp.publicKey,
-        authority: ownerKp.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([kp, ownerKp])
-      .rpc();
-  }
-
-  async function fundAccountFromProvider(
-  to: PublicKey,
-  lamports = 0.05 * anchor.web3.LAMPORTS_PER_SOL
-) {
-  const tx = new anchor.web3.Transaction().add(
-    anchor.web3.SystemProgram.transfer({
-      fromPubkey: provider.wallet.publicKey,
-      toPubkey: to,
-      lamports,
-    })
-  );
-
-  await provider.sendAndConfirm(tx);
-}
-
-
-  it.skip("Airdrop SOL", async () => {
-    await airdrop(alice.publicKey);
-    await airdrop(bob.publicKey);
-  });
-
-  it("Initialize confidential token mint", async () => {
-    mintKp = Keypair.generate();
-
-    await incoTokenProgram.methods
-      .initializeMint(DECIMALS, authority.publicKey, authority.publicKey)
-      .accounts({
-        mint: mintKp.publicKey,
-        payer: authority.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([mintKp])
-      .rpc();
-  });
-
-  it("Initialize confidential token accounts", async () => {
-    aliceTokenKp = Keypair.generate();
-    vaultTokenKp = Keypair.generate();
-    bobTokenKp = Keypair.generate();
-
-    // console.log("Alice token account:", aliceTokenKp.publicKey.toBase58());
-    // console.log("Vault token account:", vaultTokenKp.publicKey.toBase58());
-    // console.log("Bob token account:", bobTokenKp.publicKey.toBase58()); 
-  await fundAccountFromProvider(aliceTokenKp.publicKey);
-  await fundAccountFromProvider(vaultTokenKp.publicKey);
-  await fundAccountFromProvider(bobTokenKp.publicKey);
-
-    await initTokenAccount(aliceTokenKp, alice);
-    await initTokenAccount(vaultTokenKp, authority.payer);
-    await initTokenAccount(bobTokenKp, bob);
-  });
-
-  it("Mint encrypted balance to Alice", async () => {
-    const encryptedMint = await encryptValue(
-      100n * 10n ** BigInt(DECIMALS)
-    );
-
-    await incoTokenProgram.methods
-      .mintToChecked(hexToBuffer(encryptedMint), INPUT_TYPE, DECIMALS)
-      .accounts({
-        mint: mintKp.publicKey,
-        account: aliceTokenKp.publicKey,
-        authority: authority.publicKey,
-      })
-      .rpc();
-  });
-
-  it("Initialize FeeVault", async () => {
-    [feeVault] = PublicKey.findProgramAddressSync(
-      [Buffer.from("fee_vault"), mintKp.publicKey.toBuffer()],
+  before(async () => {
+    [deskConfig] = PublicKey.findProgramAddressSync(
+      [Buffer.from("desk_config"), authority.publicKey.toBuffer()],
       program.programId
     );
 
-    await program.methods
-      .initialize()
-      .accounts({
-        authority: authority.publicKey,
-        tokenMint: mintKp.publicKey,
-        vaultTokenAccount: vaultTokenKp.publicKey,
-        feeVault,
-        systemProgram: SystemProgram.programId,
-      }as any)
-      .rpc();
-
-    const vault = await program.account.feeVault.fetch(feeVault);
-    expect(vault.totalFeesHandle.toString()).to.equal("0");
-  });
-
-  it("Alice pays encrypted fee", async () => {
-    const encryptedFee = await encryptValue(40n * 10n ** BigInt(DECIMALS));
-
-    const tx = await program.methods
-      .collectFee(hexToBuffer(encryptedFee), DECIMALS)
-      .accounts({
-        payer: alice.publicKey,
-        feeVault,
-        fromToken: aliceTokenKp.publicKey,
-        vaultTokenAccount: vaultTokenKp.publicKey,
-        tokenMint: mintKp.publicKey,
-        incoTokenProgram: CONFIDENTIAL_TOKEN_2022_PROGRAM_ID,
-        incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      }as any)
-      .signers([alice])
-      .rpc();
-
-      console.log("Transaction signature:", tx);
-
-    const vault = await program.account.feeVault.fetch(feeVault);
-    expect(vault.totalFeesHandle.toString()).to.not.equal("0");
-  });
-
-
-  it("Authority distributes encrypted payout to Bob", async () => {
-    const encryptedRequested = await encryptValue(
-      30n * 10n ** BigInt(DECIMALS)
+    [intentSessionOne] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("intent_session"),
+        deskConfig.toBuffer(),
+        SESSION_ID_ONE.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
     );
 
-    await program.methods
-      .distribute(hexToBuffer(encryptedRequested), DECIMALS)
-      .accounts({
-        authority: authority.publicKey,
-        feeVault,
-        vaultTokenAccount: vaultTokenKp.publicKey,
-        recipientTokenAccount: bobTokenKp.publicKey,
-        tokenMint: mintKp.publicKey,
-        incoTokenProgram: CONFIDENTIAL_TOKEN_2022_PROGRAM_ID,
-        incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      }as any)
-      .rpc();
+    [intentSessionTwo] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("intent_session"),
+        deskConfig.toBuffer(),
+        SESSION_ID_TWO.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
+    );
 
-    const vault = await program.account.feeVault.fetch(feeVault);
-    expect(vault.pendingDistributionHandle.toString()).to.not.equal("0");
   });
 
-
-  it("Grant Bob decryption permission", async () => {
-    const vault = await program.account.feeVault.fetch(feeVault);
-    const handle = BigInt(vault.pendingDistributionHandle.toString());
-
-    const handleBuf = Buffer.alloc(16);
-    let h = handle;
-    for (let i = 0; i < 16; i++) {
-      handleBuf[i] = Number(h & 0xffn);
-      h >>= 8n;
+  it("initializes desk policy", async () => {
+    try {
+      await program.methods
+        .initializeDesk(new BN(1_000_000), 250, new BN(5_000_000))
+        .accounts({
+          authority: authority.publicKey,
+          deskConfig,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc();
+    } catch {
+      await program.methods
+        .updatePolicy(new BN(1_000_000), 250, new BN(5_000_000))
+        .accounts({
+          authority: authority.publicKey,
+          deskConfig,
+        })
+        .rpc();
     }
 
-    const [allowancePda] = PublicKey.findProgramAddressSync(
-      [handleBuf, bob.publicKey.toBuffer()],
-      INCO_LIGHTNING_PROGRAM_ID
+    const desk = await program.account.deskConfig.fetch(deskConfig);
+    expect(desk.authority.toBase58()).to.equal(authority.publicKey.toBase58());
+    expect(desk.maxNotionalPerExecution.toNumber()).to.equal(1_000_000);
+    expect(desk.maxSlippageBps).to.equal(250);
+    expect(desk.dailyNotionalCap.toNumber()).to.equal(5_000_000);
+    expect(desk.halted).to.equal(false);
+  });
+
+  it("opens private intent and submits private quote", async () => {
+    await program.methods
+      .openPrivateIntent(
+        SESSION_ID_ONE,
+        commitment("intent:buy:SOL:confidential"),
+        new BN(800_000),
+        180
+      )
+      .accounts({
+        agent: agent.publicKey,
+        payer: authority.publicKey,
+        deskConfig,
+        intentSession: intentSessionOne,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([agent])
+      .rpc();
+
+    await program.methods
+      .submitPrivateQuote(SESSION_ID_ONE, commitment("quote:makerA:priceband"))
+      .accounts({
+        authority: authority.publicKey,
+        desk: deskConfig,
+        intentSession: intentSessionOne,
+      })
+      .rpc();
+
+    const session = await program.account.intentSession.fetch(intentSessionOne);
+    expect(session.status).to.equal(2);
+    expect(session.requestedNotionalCap.toNumber()).to.equal(800_000);
+    expect(session.requestedSlippageBps).to.equal(180);
+  });
+
+  it("settles private execution under policy", async () => {
+    const beforeDesk = await program.account.deskConfig.fetch(deskConfig);
+    const beforeConsumed = beforeDesk.consumedToday.toNumber();
+    const beforeSettlementId = beforeDesk.lastSettlementId.toNumber();
+
+    await program.methods
+      .settlePrivateExecution(
+        SESSION_ID_ONE,
+        new BN(700_000),
+        120,
+        commitment("settlement:tx-ref-001")
+      )
+      .accounts({
+        authority: authority.publicKey,
+        desk: deskConfig,
+        intentSession: intentSessionOne,
+      })
+      .rpc();
+
+    const desk = await program.account.deskConfig.fetch(deskConfig);
+    const session = await program.account.intentSession.fetch(intentSessionOne);
+
+    expect(session.status).to.equal(3);
+    expect(session.settlementAmount.toNumber()).to.equal(700_000);
+    expect(session.realizedSlippageBps).to.equal(120);
+    expect(desk.consumedToday.toNumber() - beforeConsumed).to.equal(700_000);
+    expect(desk.lastSettlementId.toNumber()).to.equal(beforeSettlementId + 1);
+  });
+
+  it("blocks settlement above session cap", async () => {
+    await program.methods
+      .openPrivateIntent(
+        SESSION_ID_TWO,
+        commitment("intent:sell:ETH:confidential"),
+        new BN(200_000),
+        150
+      )
+      .accounts({
+        agent: agent.publicKey,
+        payer: authority.publicKey,
+        deskConfig,
+        intentSession: intentSessionTwo,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([agent])
+      .rpc();
+
+    await program.methods
+      .submitPrivateQuote(SESSION_ID_TWO, commitment("quote:makerB:tight"))
+      .accounts({
+        authority: authority.publicKey,
+        desk: deskConfig,
+        intentSession: intentSessionTwo,
+      })
+      .rpc();
+
+    try {
+      await program.methods
+        .settlePrivateExecution(
+          SESSION_ID_TWO,
+          new BN(300_000),
+          120,
+          commitment("settlement:tx-ref-002")
+        )
+        .accounts({
+          authority: authority.publicKey,
+          desk: deskConfig,
+          intentSession: intentSessionTwo,
+        })
+        .rpc();
+      expect.fail("expected policy failure");
+    } catch (error) {
+      expect(String(error)).to.include("SettlementAboveSessionCap");
+    }
+  });
+
+  it("can halt desk and reject new intents", async () => {
+    await program.methods
+      .setHalt(true)
+      .accounts({
+        authority: authority.publicKey,
+        deskConfig,
+      })
+      .rpc();
+
+    const sessionId = new BN(sessionBase * 10 + 3);
+    const [intentSessionThree] = PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("intent_session"),
+        deskConfig.toBuffer(),
+        sessionId.toArrayLike(Buffer, "le", 8),
+      ],
+      program.programId
     );
 
+    try {
+      await program.methods
+        .openPrivateIntent(
+          sessionId,
+          commitment("intent:halt-check"),
+          new BN(100_000),
+          100
+        )
+        .accounts({
+          agent: agent.publicKey,
+          payer: authority.publicKey,
+          deskConfig,
+          intentSession: intentSessionThree,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([agent])
+        .rpc();
+      expect.fail("expected halted desk rejection");
+    } catch (error) {
+      expect(String(error)).to.include("DeskHalted");
+    }
+
     await program.methods
-      .grantDecryptAccess(new anchor.BN(handle))
+      .setHalt(false)
       .accounts({
         authority: authority.publicKey,
-        allowanceAccount: allowancePda,
-        allowedAddress: bob.publicKey,
-        incoLightningProgram: INCO_LIGHTNING_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      }as any)
+        deskConfig,
+      })
       .rpc();
-  });
-
-
-  it.skip("Bob decrypts payout correctly", async () => {
-    const vault = await program.account.feeVault.fetch(feeVault);
-    const handle = BigInt(vault.pendingDistributionHandle.toString());
-
-    const result = await decrypt(
-  [handle],
-  {
-    wallet: {
-      publicKey: bob.publicKey,
-      signTransaction: async (tx) => {
-        tx.partialSign(bob);
-        return tx;
-      },
-      signAllTransactions: async (txs) => {
-        txs.forEach(tx => tx.partialSign(bob));
-        return txs;
-      },
-    },
-    connection,
-  }
-);
-
-    const plaintext = BigInt(result.plaintexts[0]);
-
-    expect(plaintext).to.equal(30n * 10n ** BigInt(DECIMALS));
-    console.log("Bob decrypted payout:", plaintext.toString());
-  });
-
-  it("Settle epoch", async () => {
-    await program.methods
-      .settleEpoch()
-      .accounts({
-        authority: authority.publicKey,
-        feeVault,
-      }as any)
-      .rpc();
-
-    const vault = await program.account.feeVault.fetch(feeVault);
-    expect(vault.isClosed).to.equal(true);
   });
 });

@@ -1,27 +1,53 @@
-<h1 align="center">Confidential Economic Engine (CEE)</h1>
+# MagicBlock Agentic Privacy Desk
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Solana-Devnet-green" alt="Solana Devnet">
-  <img src="https://img.shields.io/badge/Anchor-0.31.1-blue" alt="Anchor">
-  <img src="https://img.shields.io/badge/Inco%20Lightning-0.1.4-purple" alt="Inco Lightning">
-  <img src="https://img.shields.io/badge/FHE-Enabled-red" alt="FHE">
-  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
-</p>
+Privacy-first agent-to-agent execution and settlement on Solana, built for the **Colosseum Privacy Track**.
 
-<p align="center">
-  <strong>A reusable, privacy-first economic coordination layer for Solana</strong><br>
-  <i>Enabling confidential payments, treasuries, and sealed economic flows using Inco Lightning </i>
-</p>
+## Bounty Submission Quick View
 
-<p align="center">
-  <b>Program ID (Devnet):</b> <code>BpZDexTuoFCrLyxEkD7tv2jRotJGVtCpyuhDReeWvEN4</code>
-</p>
+- **Track fit:** PER-style private intent + quote commitments and Private Payments settlement flow
+- **On-chain engine:** policy-constrained desk lifecycle in `programs/confidential-economic-engine/src/lib.rs`
+- **Working flow:** `initialize_desk` → `open_private_intent` → `submit_private_quote` → `settle_private_execution`
+- **Safety controls:** max notional, max slippage, daily cap, and emergency halt
+
+## Required Submission Artifacts
+
+- **Demo script:** `docs/demo-script-3min.md`
+- **Live integration runbook:** `docs/magicblock-live-integration.md`
+- **Judge checklist:** `docs/submission-checklist.md`
+- **Frontend env template:** `app/.env.example`
+
+## Setup (fast path)
+
+```bash
+yarn install
+cd app && yarn install
+cp .env.example .env.local
+```
+
+For strict live judging mode, set in `app/.env.local`:
+
+```bash
+NEXT_PUBLIC_MAGICBLOCK_REQUIRE_LIVE=true
+```
+
+Then run:
+
+```bash
+# repo root
+yarn test
+
+# frontend
+cd app
+
+```
 
 ---
 
+## Legacy background (archived)
+
+The following sections capture earlier research context from the initial prototype. The active bounty implementation and demo flow are defined by the files listed above.
 
 ## Why CEE Exists
-
 ### The Fundamental Problem
 
 Imagine you're building:
@@ -50,70 +76,37 @@ The Web3 ecosystem is maturing beyond speculation into **real-world applications
 
 ---
 
-## How It Works: Complete Flow
+## 🚀 How It Works: Complete Flow
 
 Here's the complete journey from encrypted token creation to private distribution:
 
 ```mermaid
-graph LR
-    subgraph "1️⃣ Setup Phase"
-        A["🪙 Create<br/>Confidential Token"] --> B["👤 Create Token<br/>Accounts<br/>Alice | Bob | Vault"]
-        B --> C["💰 Mint to Alice<br/>encrypted 100 tokens"]
-        C --> D["🏦 Initialize<br/>CEE Vault"]
-    end
-    
-    subgraph "2️⃣ Collection Phase"
-        E["🔐 Alice Encrypts<br/>40 tokens"] --> F["📤 Send to CEE<br/>collect_fee"]
-        F --> G["➕ CEE e_add<br/>encrypted: 0+40"]
-        G --> H["🏪 Vault holds<br/>encrypted 40"]
-        
-        I["� Bob Encrypts<br/>50 tokens"] --> J["� Send to CEE<br/>collect_fee"]
-        J --> K["➕ CEE e_add<br/>encrypted: 40+50"]
-        K --> L["🏪 Vault holds<br/>encrypted 90"]
-    end
-    
-    subgraph "3️⃣ Distribution Phase"
-        M["🔐 Authority<br/>Encrypts 30"] --> N["📥 Request<br/>distribute"]
-        N --> O["🔢 CEE computes<br/>ENCRYPTED:<br/>remaining = 90<br/>can_give = 90≥30"]
-        O --> P["🎯 CEE selects<br/>actual = 30"]
-        P --> Q["📤 Transfer 30<br/>to Bob encrypted"]
-    end
-    
-    subgraph "4️⃣ Verification Phase"
-        R["🔑 Authority grants<br/>Bob decrypt<br/>permission"] --> S["🔓 Bob calls<br/>decrypt"]
-        S --> T["✅ Covalidator<br/>verifies permission"]
-        T --> U["📖 Bob sees:<br/>plaintext = 30"]
-    end
-    
-    subgraph "5️⃣ Settlement"
-        V["🔄 Settle Epoch"]
-        V --> W["✨ Vault reset<br/>Ready for next cycle"]
-    end
-    
-    D --> E
-    H --> I
-    L --> M
-    Q --> R
-    U --> V
-    
-    style D fill:#9C27B0,color:#fff
-    style H fill:#FF5722,color:#fff
-    style L fill:#FF5722,color:#fff
-    style O fill:#FF5722,color:#fff
-    style P fill:#FF5722,color:#fff
-    style U fill:#4CAF50,color:#fff
+flowchart LR
+  A[🪙 Create confidential token] --> B[👤 Create token accounts]
+  B --> C[💰 Mint encrypted tokens to Alice]
+  C --> D[🏦 Initialize CEE vault]
+
+  D --> E[🔐 Collect encrypted fees]
+  E --> F[🎯 Distribute encrypted payout]
+  F --> G[🔑 Grant decrypt permission]
+  G --> H[🔓 Bob decrypts payout]
+  H --> I[🔄 Settle epoch]
+
+  style A fill:#2563EB,color:#fff
+  style D fill:#7C3AED,color:#fff
+  style E fill:#F97316,color:#fff
+  style F fill:#F97316,color:#fff
+  style G fill:#10B981,color:#fff
+  style H fill:#10B981,color:#fff
+  style I fill:#14B8A6,color:#fff
 ```
 
-**Complete Flow Summary:**
-
-| Phase | What | Privacy |
-|-------|------|---------|
-| **Setup** | Token mint & accounts | 🔐 Encrypted |
-| **Alice Pays (40)** | Encrypt, transfer, e_add | 🔐 Hidden |
-| **Bob Pays (50)** | Encrypt, transfer, e_add | 🔐 Hidden |
-| **Distribution (30)** | Encrypted conditions & transfer | 🔐 Hidden |
-| **Decrypt & Verify** | Bob authorized to decrypt | 🔐 Bob only |
-| **Settlement** | Reset vault | 🔐 Ready for next |
+**Key Points:**
+- ✅ **Mint & Tokens managed by Inco Token-2022** (encrypted by default)
+- ✅ **CEE orchestrates operations** without ever seeing plaintext
+- ✅ **Encrypted arithmetic** (e_add, e_ge, e_select) happens in Inco's TEE
+- ✅ **Only Bob can decrypt** - access controlled via allowance PDAs
+- ✅ **No information leakage** - constant-time execution prevents attacks
 
 ---
 

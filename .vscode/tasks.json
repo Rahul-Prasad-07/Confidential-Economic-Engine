@@ -1,0 +1,11 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "track-frontend-rebuild-plan",
+			"type": "shell",
+			"command": "echo \"tracking via task placeholder\"",
+			"isBackground": false
+		}
+	]
+}
